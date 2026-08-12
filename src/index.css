@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-size: 16px;
+  }
+  body {
+    background-color: #FAF8F5;
+    color: #0F172A;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, .font-editorial {
+    font-family: 'Playfair Display', Georgia, serif;
+    color: #0F172A;
+    font-weight: 800;
+  }
+}
+
+/* Bright high-contrast utility classes */
+.text-bright-red {
+  color: #dc2626;
+}
+
+.text-bright-emerald {
+  color: #059669;
+}
+
+.text-bright-blue {
+  color: #2563eb;
+}
+
+.text-bright-amber {
+  color: #d97706;
+}
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  header, footer, .print\:hidden {
+    display: none !important;
+  }
+}
+
