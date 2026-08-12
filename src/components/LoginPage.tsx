@@ -27,7 +27,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       id: studentId.trim().toUpperCase(),
       name: studentName.trim(),
       role: 'student',
-      sem: studentSem.trim() || '5th Semester CSE',
+      sem: studentSem.trim() || 'CSE-A',
+      assignedFaculty: 'Prof. Dr. Pushpa Mohan',
     });
   };
 

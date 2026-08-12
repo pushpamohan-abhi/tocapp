@@ -14,8 +14,9 @@ export const DEFAULT_STUDENT: UserProfile = {
   id: '1VT22CS001',
   name: 'Rahul Sharma',
   role: 'student',
-  sem: '5th Semester CSE',
-  department: 'Computer Science & Engineering'
+  sem: 'CSE-A',
+  department: 'Computer Science & Engineering',
+  assignedFaculty: 'Prof. Dr. Pushpa Mohan'
 };
 
 export const DEFAULT_FACULTY: UserProfile = {
@@ -46,7 +47,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, currentUs
       name: studentName.trim(),
       role: 'student',
       sem: studentSem,
-      department: 'CSE'
+      department: 'CSE',
+      assignedFaculty: currentUser.assignedFaculty || 'Prof. Dr. Pushpa Mohan'
     });
     onClose();
   };

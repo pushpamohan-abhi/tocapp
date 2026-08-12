@@ -1,24 +1,7 @@
-import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
+import type { Request, Response } from 'express';
 
-dotenv.config();
-
-const app = express();
-const PORT = 3000;
-
-app.use(express.json());
-
-// Initialize Google GenAI if key is present
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-
-// In-memory score store with safe file backup
-import fs from "fs";
-
-let scoresStore: any[] = [
+// Global memory cache as fallback when GitHub environment variables are not set
+let serverlessScoresCache: any[] = [
   {
     id: 'score_1',
     faculty: 'Prof. Dr. Pushpa Mohan',
@@ -66,38 +49,7 @@ let scoresStore: any[] = [
   }
 ];
 
-// Helper to safely load file scores
-try {
-  const scoresFilePath = path.join(process.cwd(), 'scores.json');
-  if (fs.existsSync(scoresFilePath)) {
-    const raw = fs.readFileSync(scoresFilePath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      scoresStore = parsed;
-    }
-  }
-} catch (e) {
-  console.log("Scores file load info:", e);
-}
-
-const saveScoresToFile = (scores: any[]) => {
-  try {
-    const scoresFilePath = path.join(process.cwd(), 'scores.json');
-    fs.writeFileSync(scoresFilePath, JSON.stringify(scores, null, 2));
-
-    // Also write CSV version
-    let csvContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n";
-    scores.forEach(s => {
-      csvContent += `"${s.faculty || 'Prof. Dr. Pushpa Mohan'}","${s.className || 'CSE-A'}","${s.userId}","${s.userName}","${s.assessment || 'Module ' + s.moduleNumber + ' Quiz'}",${s.score},${s.totalQuestions},"${s.percentage}%","${s.timestamp}"\n`;
-    });
-    fs.writeFileSync(path.join(process.cwd(), 'scores.csv'), csvContent);
-  } catch (e) {
-    // EROFS on read-only environments like Vercel
-    console.log("Safe persistent write notice (read-only filesystem on serverless):", e);
-  }
-};
-
-// GitHub REST API Integration & CSV Helper Functions
+// Helper to parse CSV string line into array of column values
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
@@ -180,6 +132,7 @@ function recordToCsvRow(s: any): string {
   return `"${faculty.replace(/"/g, '""')}","${className.replace(/"/g, '""')}","${userId.replace(/"/g, '""')}","${userName.replace(/"/g, '""')}","${assessment.replace(/"/g, '""')}",${score},${total},"${percentage}%","${date.replace(/"/g, '""')}"`;
 }
 
+// GitHub REST API Helper Functions
 async function fetchScoresFromGitHub() {
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   const GITHUB_OWNER = process.env.GITHUB_OWNER;
@@ -359,187 +312,118 @@ async function saveAllRecordsToGitHubCSV(records: any[]) {
   }
 }
 
-// Score API Routes
-app.get("/api/scores", async (req, res) => {
-  try {
-    const githubData = await fetchScoresFromGitHub();
-    let records = scoresStore;
+export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
-    if (githubData && githubData.content) {
-      records = parseCsvToRecords(githubData.content);
-      scoresStore = records;
-    }
-
-    const { faculty, className, assessment } = req.query;
-    let result = [...records];
-
-    if (faculty && faculty !== 'all') {
-      result = result.filter(s => (s.faculty || '').toLowerCase() === String(faculty).toLowerCase());
-    }
-    if (className && className !== 'all') {
-      result = result.filter(s => (s.className || '').toLowerCase() === String(className).toLowerCase());
-    }
-    if (assessment && assessment !== 'all') {
-      result = result.filter(s => (s.assessment || '').toLowerCase() === String(assessment).toLowerCase());
-    }
-
-    res.json(result);
-  } catch (e: any) {
-    console.error("GET /api/scores error:", e);
-    res.json(scoresStore);
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
-});
 
-app.post("/api/scores", async (req, res) => {
-  try {
-    const record = req.body;
-    if (!record || !record.userId) {
-      return res.status(400).json({ error: "Missing required student user ID" });
+  if (req.method === 'GET') {
+    try {
+      const githubData = await fetchScoresFromGitHub();
+      let records = serverlessScoresCache;
+
+      if (githubData && githubData.content) {
+        records = parseCsvToRecords(githubData.content);
+        serverlessScoresCache = records;
+      }
+
+      const { faculty, className, assessment } = req.query || {};
+      let result = [...records];
+
+      if (faculty && faculty !== 'all') {
+        result = result.filter(s => (s.faculty || '').toLowerCase() === String(faculty).toLowerCase());
+      }
+      if (className && className !== 'all') {
+        result = result.filter(s => (s.className || '').toLowerCase() === String(className).toLowerCase());
+      }
+      if (assessment && assessment !== 'all') {
+        result = result.filter(s => (s.assessment || '').toLowerCase() === String(assessment).toLowerCase());
+      }
+
+      return res.status(200).json(result);
+    } catch (e: any) {
+      console.error("GET /api/scores error:", e);
+      return res.status(200).json(serverlessScoresCache);
     }
-
-    const formattedRecord = {
-      id: record.id || `score_${record.userId}_${Date.now()}`,
-      faculty: record.faculty || 'Prof. Dr. Pushpa Mohan',
-      className: record.className || 'CSE-A',
-      userId: record.userId,
-      userName: record.userName || 'Student',
-      userRole: record.userRole || 'student',
-      assessment: record.assessment || `Module ${record.moduleNumber || 1} Quiz`,
-      moduleNumber: record.moduleNumber || 1,
-      score: record.score || 0,
-      totalQuestions: record.totalQuestions || 10,
-      percentage: record.percentage || 0,
-      timestamp: record.timestamp || new Date().toISOString().slice(0, 10),
-      userAnswers: record.userAnswers || {}
-    };
-
-    const githubRecords = await appendScoreToGitHubCSV(formattedRecord);
-    if (githubRecords) {
-      scoresStore = githubRecords;
-      return res.json({ success: true, score: formattedRecord, allScores: githubRecords, storage: 'github' });
-    }
-
-    // Remove any previous attempt by the same student for this assessment
-    scoresStore = scoresStore.filter(
-      s => !(s.userId === formattedRecord.userId && s.assessment === formattedRecord.assessment)
-    );
-    scoresStore.push(formattedRecord);
-
-    saveScoresToFile(scoresStore);
-    res.json({ success: true, score: formattedRecord, allScores: scoresStore, storage: 'local-fallback' });
-  } catch (e: any) {
-    console.error("POST /api/scores error:", e);
-    res.status(500).json({ error: e.message || "Failed to save score" });
   }
-});
 
-app.delete("/api/scores", async (req, res) => {
-  const { id } = req.query;
-  if (id) {
-    scoresStore = scoresStore.filter(s => s.id !== id);
-  } else {
-    scoresStore = [];
-  }
-  saveScoresToFile(scoresStore);
-  await saveAllRecordsToGitHubCSV(scoresStore);
-  res.json({ success: true, scores: scoresStore });
-});
+  if (req.method === 'POST') {
+    try {
+      const record = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      if (!record || !record.userId) {
+        return res.status(400).json({ error: "Missing required student USN/ID" });
+      }
 
-// API Endpoints
-app.post("/api/ai-tutor", async (req, res) => {
-  try {
-    const { prompt, section, context } = req.body;
-    if (!ai) {
-      return res.json({
-        reply: "AI Tutor is currently running in offline simulation mode (GEMINI_API_KEY not configured). Based on Ullman Automata theory, remember that regular expressions describe regular languages accepted by finite automata. For section " + section + ", " + (context || "keep practicing state transitions and pumping lemma proofs!")
+      const formattedRecord = {
+        id: record.id || `score_${record.userId}_${Date.now()}`,
+        faculty: record.faculty || 'Prof. Dr. Pushpa Mohan',
+        className: record.className || 'CSE-A',
+        userId: record.userId,
+        userName: record.userName || 'Student',
+        userRole: record.userRole || 'student',
+        assessment: record.assessment || `Module ${record.moduleNumber || 1} Quiz`,
+        moduleNumber: record.moduleNumber || 1,
+        score: record.score || 0,
+        totalQuestions: record.totalQuestions || 10,
+        percentage: record.percentage || 0,
+        timestamp: record.timestamp || new Date().toISOString().slice(0, 10),
+        userAnswers: record.userAnswers || {}
+      };
+
+      const githubRecords = await appendScoreToGitHubCSV(formattedRecord);
+      if (githubRecords) {
+        serverlessScoresCache = githubRecords;
+        return res.status(200).json({
+          success: true,
+          score: formattedRecord,
+          allScores: githubRecords,
+          storage: 'github'
+        });
+      }
+
+      // Fallback if GitHub credentials not provided
+      serverlessScoresCache = serverlessScoresCache.filter(
+        s => !(s.userId === formattedRecord.userId && s.assessment === formattedRecord.assessment)
+      );
+      serverlessScoresCache.push(formattedRecord);
+
+      return res.status(200).json({
+        success: true,
+        score: formattedRecord,
+        allScores: serverlessScoresCache,
+        storage: 'local-fallback'
       });
+    } catch (e: any) {
+      console.error("POST /api/scores error:", e);
+      return res.status(500).json({ error: e.message || "Failed to save score to GitHub" });
     }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `You are an expert Automata Theory professor and AI tutor specializing in 'Introduction to Automata Theory, Languages, and Computation' by Ullman, Hopcroft, and Motwani. 
-The student is asking about Section: ${section || "General"}.
-Context: ${context || "None"}
-Student Query/Prompt: ${prompt}
-
-Provide a clear, pedagogical, encouraging response using alternative teaching methods (analogies, manifold representations, real-world examples). Keep it structured and precise.`
-            }
-          ]
-        }
-      ]
-    });
-
-    res.json({ reply: response.text });
-  } catch (error: any) {
-    console.error("AI Tutor Error:", error);
-    res.status(500).json({ error: error.message || "Failed to generate AI tutoring response." });
   }
-});
 
-app.post("/api/evaluate-hot", async (req, res) => {
-  try {
-    const { questionId, userAnswer, questionTitle } = req.body;
-    if (!ai) {
-      // Offline fallback evaluation
-      const correct = userAnswer && userAnswer.length > 20;
-      return res.json({
-        score: correct ? 85 : 40,
-        feedback: correct 
-          ? "Great analytical reasoning! You correctly identified the core structural properties and demonstrated sound critical thinking in line with Ullman's principles."
-          : "Your answer touches on basic concepts, but needs deeper rigor. Consider applying formal closure properties or state limits to your argument."
-      });
+  if (req.method === 'DELETE') {
+    try {
+      const { id } = req.query || {};
+      if (id) {
+        serverlessScoresCache = serverlessScoresCache.filter(s => s.id !== id);
+      } else {
+        serverlessScoresCache = [];
+      }
+
+      await saveAllRecordsToGitHubCSV(serverlessScoresCache);
+
+      return res.status(200).json({ success: true, scores: serverlessScoresCache });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message || "Failed to delete score" });
     }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `You are an expert professor evaluating a student's Higher Order Thinking (HOT) question response based on Hopcroft & Ullman Automata Theory.
-Question ID: ${questionId}
-Question Title: ${questionTitle}
-Student Answer: ${userAnswer}
-
-Evaluate the student's answer critically and pedagogically. Return a JSON-like text with score (0-100) and constructive feedback pointing out strengths and areas for deeper analytical thought.`
-            }
-          ]
-        }
-      ]
-    });
-
-    res.json({ evaluation: response.text });
-  } catch (error: any) {
-    console.error("HOT Eval Error:", error);
-    res.status(500).json({ error: error.message || "Evaluation failed." });
-  }
-});
-
-// Vite middleware setup
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Automata Theory Lab server running on http://localhost:${PORT}`);
-  });
+  return res.status(405).json({ error: "Method not allowed" });
 }
-
-startServer();

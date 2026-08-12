@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QuizScoreRecord, UserProfile } from '../types';
-import { Download, Table, Trash2, Search, Filter, Award, CheckCircle2, FileSpreadsheet, RefreshCw, UserCheck } from 'lucide-react';
+import { Download, Table, Trash2, Search, Filter, FileSpreadsheet, RefreshCw, UserCheck } from 'lucide-react';
 
 interface ScoresViewProps {
   currentUser: UserProfile;
@@ -8,51 +8,79 @@ interface ScoresViewProps {
 
 export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
   const [scores, setScores] = useState<QuizScoreRecord[]>([]);
-  const [selectedModule, setSelectedModule] = useState<number | 'all'>('all');
+  const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedAssessment, setSelectedAssessment] = useState<string>('all');
+  const [selectedFaculty, setSelectedFaculty] = useState<string>(
+    currentUser.role === 'faculty' ? currentUser.name : 'all'
+  );
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadScores = () => {
+  const loadScores = async () => {
+    try {
+      const res = await fetch('/api/scores');
+      if (res.ok) {
+        const apiScores: QuizScoreRecord[] = await res.json();
+        if (apiScores && apiScores.length > 0) {
+          setScores(apiScores);
+          localStorage.setItem('vtu_quiz_scores', JSON.stringify(apiScores));
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Server API fetch error, falling back to local storage:", e);
+    }
+
+    // Fallback to localStorage
     try {
       const stored = localStorage.getItem('vtu_quiz_scores');
       if (stored) {
         setScores(JSON.parse(stored));
       } else {
-        // Mock seed data for demonstration if empty
+        // Mock seed data matching exact requirements
         const seedScores: QuizScoreRecord[] = [
           {
             id: 'score_1',
+            faculty: 'Prof. Dr. Pushpa Mohan',
+            className: 'CSE-A',
             userId: '1VT22CS001',
             userName: 'Rahul Sharma',
             userRole: 'student',
+            assessment: 'Module 1 Quiz',
             moduleNumber: 1,
             score: 5,
             totalQuestions: 6,
             percentage: 83,
-            timestamp: new Date(Date.now() - 3600000 * 24).toLocaleString(),
+            timestamp: '2026-08-11',
             userAnswers: {}
           },
           {
             id: 'score_2',
+            faculty: 'Prof. Dr. Pushpa Mohan',
+            className: 'CSE-A',
             userId: '1VT22CS002',
             userName: 'Priya Ananth',
             userRole: 'student',
+            assessment: 'Module 1 Quiz',
             moduleNumber: 1,
             score: 6,
             totalQuestions: 6,
             percentage: 100,
-            timestamp: new Date(Date.now() - 3600000 * 12).toLocaleString(),
+            timestamp: '2026-08-11',
             userAnswers: {}
           },
           {
             id: 'score_3',
+            faculty: 'Prof. Dr. Pushpa Mohan',
+            className: 'CSE-B',
             userId: '1VT22CS003',
             userName: 'Karthik V',
             userRole: 'student',
+            assessment: 'Module 2 Quiz',
             moduleNumber: 2,
             score: 4,
             totalQuestions: 5,
             percentage: 80,
-            timestamp: new Date(Date.now() - 3600000 * 5).toLocaleString(),
+            timestamp: '2026-08-12',
             userAnswers: {}
           }
         ];
@@ -69,20 +97,22 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
   }, []);
 
   const handleExportCSV = () => {
-    if (scores.length === 0) {
+    const listToExport = filteredScores.length > 0 ? filteredScores : scores;
+    if (listToExport.length === 0) {
       alert("No quiz scores recorded yet to export.");
       return;
     }
 
-    // CSV Headers
-    let csvContent = "USN/ID,Student Name,Role,Module,Score,Total Questions,Percentage,Timestamp\n";
+    // CSV Headers matching requested structure
+    let csvContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n";
 
-    scores.forEach(s => {
+    listToExport.forEach(s => {
       const row = [
+        `"${s.faculty || 'Prof. Dr. Pushpa Mohan'}"`,
+        `"${s.className || 'CSE-A'}"`,
         `"${s.userId}"`,
         `"${s.userName}"`,
-        `"${s.userRole}"`,
-        `"Module ${s.moduleNumber}"`,
+        `"${s.assessment || `Module ${s.moduleNumber} Quiz`}"`,
         s.score,
         s.totalQuestions,
         `"${s.percentage}%"`,
@@ -102,33 +132,57 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
     URL.revokeObjectURL(url);
   };
 
-  const handleResetAttempt = (id: string, userName: string, modNum: number) => {
+  const handleResetAttempt = async (id: string, userName: string, modNum: number) => {
     if (!window.confirm(`Are you sure you want to reset the Module ${modNum} quiz attempt for ${userName}? This will allow the student to attempt the quiz again.`)) {
       return;
     }
     const updated = scores.filter(s => s.id !== id);
     setScores(updated);
     localStorage.setItem('vtu_quiz_scores', JSON.stringify(updated));
+
+    try {
+      await fetch(`/api/scores?id=${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error("API score delete error:", e);
+    }
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (!window.confirm("Faculty Action: Clear ALL score records? This action cannot be undone.")) {
       return;
     }
     setScores([]);
     localStorage.setItem('vtu_quiz_scores', JSON.stringify([]));
+
+    try {
+      await fetch('/api/scores', { method: 'DELETE' });
+    } catch (e) {
+      console.error("API score clear error:", e);
+    }
   };
 
+  // Collect unique values for filters
+  const uniqueClasses = Array.from(new Set(scores.map(s => s.className || 'CSE-A').filter(Boolean)));
+  const uniqueAssessments = Array.from(new Set(scores.map(s => s.assessment || `Module ${s.moduleNumber} Quiz`).filter(Boolean)));
+  const uniqueFaculties = Array.from(new Set(scores.map(s => s.faculty || 'Prof. Dr. Pushpa Mohan').filter(Boolean)));
+
   const filteredScores = scores.filter(s => {
-    const matchesMod = selectedModule === 'all' || s.moduleNumber === selectedModule;
+    const sFaculty = s.faculty || 'Prof. Dr. Pushpa Mohan';
+    const sClass = s.className || 'CSE-A';
+    const sAssessment = s.assessment || `Module ${s.moduleNumber} Quiz`;
+
+    const matchesFaculty = selectedFaculty === 'all' || sFaculty.toLowerCase() === selectedFaculty.toLowerCase();
+    const matchesClass = selectedClass === 'all' || sClass.toLowerCase() === selectedClass.toLowerCase();
+    const matchesAssessment = selectedAssessment === 'all' || sAssessment.toLowerCase() === selectedAssessment.toLowerCase();
     const matchesSearch = s.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           s.userId.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesMod && matchesSearch;
+
+    return matchesFaculty && matchesClass && matchesAssessment && matchesSearch;
   });
 
-  const totalAttempts = scores.length;
+  const totalAttempts = filteredScores.length;
   const avgPercentage = totalAttempts > 0
-    ? Math.round(scores.reduce((acc, curr) => acc + curr.percentage, 0) / totalAttempts)
+    ? Math.round(filteredScores.reduce((acc, curr) => acc + curr.percentage, 0) / totalAttempts)
     : 0;
 
   return (
@@ -140,9 +194,9 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>CSV Database & Score Tracking</span>
           </div>
-          <h2 className="font-serif italic text-3xl text-[#1A1A1A]">Student Quiz Performance & CSV Log Records</h2>
+          <h2 className="font-serif italic text-3xl text-[#1A1A1A]">Student Quiz Performance & Master Score Records</h2>
           <p className="text-xs text-[#1A1A1A]/70 max-w-2xl">
-            All student quiz evaluations are recorded upon completion. Only 1 attempt is permitted per student per module. Records can be exported directly as a CSV file.
+            All student quiz evaluations are recorded upon completion. Filter records by faculty, class, or assessment and export scores directly as a CSV file.
           </p>
         </div>
 
@@ -169,15 +223,15 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-[#1A1A1A]/10 p-5 rounded-sm space-y-1 shadow-xs">
-          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#1A1A1A]/40 block">Total Quiz Attempts Recorded</span>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#1A1A1A]/40 block">Total Attempts Viewable</span>
           <div className="text-3xl font-serif text-[#1A1A1A] font-bold">{totalAttempts}</div>
-          <p className="text-[11px] text-[#1A1A1A]/60 font-mono">Stored in CSV local storage</p>
+          <p className="text-[11px] text-[#1A1A1A]/60 font-mono">Stored in centralized CSV log</p>
         </div>
 
         <div className="bg-white border border-[#1A1A1A]/10 p-5 rounded-sm space-y-1 shadow-xs">
-          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#1A1A1A]/40 block">Average Class Percentage</span>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#1A1A1A]/40 block">Average Percentage</span>
           <div className="text-3xl font-serif text-[#991b1b] font-bold">{avgPercentage}%</div>
-          <p className="text-[11px] text-[#1A1A1A]/60 font-mono">Across all attempted modules</p>
+          <p className="text-[11px] text-[#1A1A1A]/60 font-mono">For selected filters</p>
         </div>
 
         <div className="bg-white border border-[#1A1A1A]/10 p-5 rounded-sm space-y-1 shadow-xs">
@@ -186,47 +240,80 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
             <UserCheck className="w-5 h-5 text-emerald-600" />
             <span>1 Attempt / Student</span>
           </div>
-          <p className="text-[11px] text-emerald-700 font-mono">Enforced per USN & Module ID</p>
+          <p className="text-[11px] text-emerald-700 font-mono">Enforced per USN & Assessment</p>
         </div>
       </div>
 
       {/* Filters and Search Bar */}
-      <div className="bg-[#F8F6F2] p-4 rounded-sm border border-[#1A1A1A]/10 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center space-x-2 w-full md:w-auto">
-          <Filter className="w-4 h-4 text-[#1A1A1A]/50 shrink-0" />
-          <span className="text-xs font-mono font-bold text-[#1A1A1A]">Module Filter:</span>
-          <div className="flex flex-wrap gap-1">
-            <button
-              onClick={() => setSelectedModule('all')}
-              className={`px-3 py-1 rounded text-xs font-mono font-bold transition-all ${
-                selectedModule === 'all' ? 'bg-[#1A1A1A] text-white' : 'bg-white border border-[#1A1A1A]/10 text-[#1A1A1A]/70'
-              }`}
-            >
-              All Modules
-            </button>
-            {[1, 2, 3, 4, 5].map(m => (
-              <button
-                key={m}
-                onClick={() => setSelectedModule(m)}
-                className={`px-3 py-1 rounded text-xs font-mono font-bold transition-all ${
-                  selectedModule === m ? 'bg-[#991b1b] text-white' : 'bg-white border border-[#1A1A1A]/10 text-[#1A1A1A]/70'
-                }`}
-              >
-                Mod {m}
-              </button>
-            ))}
-          </div>
+      <div className="bg-[#F8F6F2] p-5 rounded-sm border border-[#1A1A1A]/10 space-y-4">
+        <div className="flex items-center space-x-2 border-b border-[#1A1A1A]/10 pb-3">
+          <Filter className="w-4 h-4 text-[#991b1b]" />
+          <span className="text-xs font-mono font-bold text-[#1A1A1A] uppercase tracking-wider">Faculty Dashboard Filters</span>
         </div>
 
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 text-[#1A1A1A]/40 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Search by USN or Student Name..."
-            className="w-full bg-white border border-[#1A1A1A]/20 pl-9 pr-3 py-1.5 rounded text-xs font-mono outline-none focus:border-[#1A1A1A]"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Faculty Filter */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-mono font-bold text-[#1A1A1A]/70 uppercase">Faculty:</label>
+            <select
+              value={selectedFaculty}
+              onChange={e => setSelectedFaculty(e.target.value)}
+              className="w-full bg-white border border-[#1A1A1A]/20 px-3 py-2 rounded text-xs font-sans focus:border-[#1A1A1A] outline-none"
+            >
+              <option value="all">All Faculties</option>
+              {uniqueFaculties.map(f => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+              {currentUser.role === 'faculty' && !uniqueFaculties.includes(currentUser.name) && (
+                <option value={currentUser.name}>{currentUser.name}</option>
+              )}
+            </select>
+          </div>
+
+          {/* Class Filter */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-mono font-bold text-[#1A1A1A]/70 uppercase">Class / Section:</label>
+            <select
+              value={selectedClass}
+              onChange={e => setSelectedClass(e.target.value)}
+              className="w-full bg-white border border-[#1A1A1A]/20 px-3 py-2 rounded text-xs font-sans focus:border-[#1A1A1A] outline-none"
+            >
+              <option value="all">All Classes</option>
+              {uniqueClasses.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Assessment Filter */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-mono font-bold text-[#1A1A1A]/70 uppercase">Assessment / Quiz:</label>
+            <select
+              value={selectedAssessment}
+              onChange={e => setSelectedAssessment(e.target.value)}
+              className="w-full bg-white border border-[#1A1A1A]/20 px-3 py-2 rounded text-xs font-sans focus:border-[#1A1A1A] outline-none"
+            >
+              <option value="all">All Assessments</option>
+              {uniqueAssessments.map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Search Box */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-mono font-bold text-[#1A1A1A]/70 uppercase">Search Student:</label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-[#1A1A1A]/40 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Name or USN..."
+                className="w-full bg-white border border-[#1A1A1A]/20 pl-9 pr-3 py-2 rounded text-xs outline-none focus:border-[#1A1A1A]"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -235,13 +322,13 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
         <div className="p-4 bg-[#1A1A1A] text-white flex justify-between items-center">
           <div className="flex items-center space-x-2 text-xs font-mono uppercase tracking-widest font-bold">
             <Table className="w-4 h-4 text-[#991b1b]" />
-            <span>Quiz Score Records ({filteredScores.length})</span>
+            <span>Master Score CSV Records ({filteredScores.length})</span>
           </div>
           <button
             onClick={loadScores}
             className="text-[11px] font-mono text-white/70 hover:text-white flex items-center space-x-1"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>Refresh</span>
           </button>
         </div>
@@ -249,20 +336,23 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
         {filteredScores.length === 0 ? (
           <div className="p-12 text-center text-xs font-mono text-[#1A1A1A]/50 space-y-2">
             <FileSpreadsheet className="w-8 h-8 mx-auto text-[#1A1A1A]/30" />
-            <p>No quiz score records found matching your filters.</p>
+            <p>No quiz score records found matching your current filter criteria.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs font-sans">
               <thead>
                 <tr className="bg-[#F8F6F2] border-b border-[#1A1A1A]/10 text-[#1A1A1A]/70 uppercase font-mono text-[10px] tracking-wider">
-                  <th className="p-3.5">Student USN / ID</th>
+                  <th className="p-3.5">Faculty</th>
+                  <th className="p-3.5">Class</th>
+                  <th className="p-3.5">Student ID (USN)</th>
                   <th className="p-3.5">Student Name</th>
-                  <th className="p-3.5">Module</th>
-                  <th className="p-3.5">Raw Score</th>
+                  <th className="p-3.5">Assessment</th>
+                  <th className="p-3.5">Score</th>
+                  <th className="p-3.5">Total</th>
                   <th className="p-3.5">Percentage</th>
-                  <th className="p-3.5">Completion Timestamp</th>
-                  {currentUser.role === 'faculty' && <th className="p-3.5 text-right">Faculty Actions</th>}
+                  <th className="p-3.5">Date</th>
+                  {currentUser.role === 'faculty' && <th className="p-3.5 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1A1A1A]/10">
@@ -270,19 +360,20 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
                   const isCurrent = s.userId === currentUser.id;
                   return (
                     <tr key={s.id} className={`hover:bg-[#F8F6F2]/50 transition-colors ${isCurrent ? 'bg-amber-50/50 font-medium' : ''}`}>
-                      <td className="p-3.5 font-mono font-bold text-[#1A1A1A]">
-                        {s.userId}
-                        {isCurrent && <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono">You</span>}
-                      </td>
-                      <td className="p-3.5 font-serif text-[#1A1A1A] font-semibold">{s.userName}</td>
+                      <td className="p-3.5 font-medium text-[#1A1A1A]">{s.faculty || 'Prof. Dr. Pushpa Mohan'}</td>
                       <td className="p-3.5 font-mono">
-                        <span className="bg-[#1A1A1A]/5 border border-[#1A1A1A]/10 px-2 py-0.5 rounded text-[11px]">
-                          Module {s.moduleNumber}
+                        <span className="bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-[11px] font-bold text-slate-800">
+                          {s.className || 'CSE-A'}
                         </span>
                       </td>
                       <td className="p-3.5 font-mono font-bold text-[#1A1A1A]">
-                        {s.score} / {s.totalQuestions}
+                        {s.userId}
+                        {isCurrent && <span className="ml-1 text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono">You</span>}
                       </td>
+                      <td className="p-3.5 font-serif text-[#1A1A1A] font-semibold">{s.userName}</td>
+                      <td className="p-3.5 font-mono text-slate-800 font-semibold">{s.assessment || `Module ${s.moduleNumber} Quiz`}</td>
+                      <td className="p-3.5 font-mono font-bold text-[#1A1A1A]">{s.score}</td>
+                      <td className="p-3.5 font-mono text-slate-600">{s.totalQuestions}</td>
                       <td className="p-3.5 font-mono">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                           s.percentage >= 70 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
@@ -301,7 +392,7 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
                             title="Reset this student's attempt to let them retake"
                           >
                             <Trash2 className="w-3 h-3" />
-                            <span>Reset Attempt</span>
+                            <span>Reset</span>
                           </button>
                         </td>
                       )}

@@ -5,20 +5,24 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   department?: string;
-  sem?: string;
+  sem?: string; // e.g., 'CSE-A' or '5th Semester CSE'
+  assignedFaculty?: string; // e.g., 'Prof. Dr. Pushpa Mohan'
 }
 
 export interface QuizScoreRecord {
   id: string;
-  userId: string;
-  userName: string;
+  faculty: string;         // e.g., 'Prof. Dr. Pushpa Mohan'
+  className: string;       // e.g., 'CSE-A' or '5th Semester CSE'
+  userId: string;          // USN / Student ID
+  userName: string;        // Student Name
   userRole: UserRole;
+  assessment: string;      // e.g., 'Module 1 Quiz'
   moduleNumber: number;
-  score: number;
-  totalQuestions: number;
-  percentage: number;
-  timestamp: string;
-  userAnswers: Record<string, number>;
+  score: number;           // Marks obtained
+  totalQuestions: number;  // Total marks
+  percentage: number;      // e.g., 80
+  timestamp: string;       // Submission date/time (e.g., '2026-08-12')
+  userAnswers?: Record<string, number>;
 }
 
 export type SectionId = 'module1' | 'module2' | 'module3' | 'module4' | 'module5' | '3.2' | '4.1' | '4.2' | '4.4' | 'hot' | 'pbl' | 'collab' | 'tutor' | 'ppt' | 'scores';

@@ -182,22 +182,25 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
 
     const total = moduleQuizzes.length;
     const percentage = Math.round((score / total) * 100);
-    const timestamp = new Date().toLocaleString();
+    const dateStr = new Date().toISOString().slice(0, 10);
 
     const record: QuizScoreRecord = {
       id: `score_${currentUser.id}_mod${moduleNumber}_${Date.now()}`,
+      faculty: currentUser.assignedFaculty || 'Prof. Dr. Pushpa Mohan',
+      className: currentUser.sem || 'CSE-A',
       userId: currentUser.id,
       userName: currentUser.name,
       userRole: currentUser.role,
+      assessment: `Module ${moduleNumber} Quiz`,
       moduleNumber: moduleNumber,
       score: score,
       totalQuestions: total,
       percentage: percentage,
-      timestamp: timestamp,
+      timestamp: dateStr,
       userAnswers: selectedAnswers
     };
 
-    // Save into localStorage
+    // Save into localStorage and POST to Vercel/server score API
     try {
       const stored = localStorage.getItem('vtu_quiz_scores');
       const existingScores: QuizScoreRecord[] = stored ? JSON.parse(stored) : [];
@@ -208,6 +211,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
       setExistingAttemptRecord(record);
       setSubmittedQuiz(true);
 
+      // Persist to server API (/api/scores)
+      fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+      }).catch(err => console.error('Failed to sync score to server API:', err));
+
       // Download CSV score record
       downloadSingleScoreCSV(record);
     } catch (e) {
@@ -216,8 +226,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
   };
 
   const downloadSingleScoreCSV = (record: QuizScoreRecord) => {
-    let csvContent = "USN/ID,Student Name,Role,Module,Score,Total Questions,Percentage,Timestamp\n";
-    csvContent += `"${record.userId}","${record.userName}","${record.userRole}","Module ${record.moduleNumber}",${record.score},${record.totalQuestions},"${record.percentage}%","${record.timestamp}"\n`;
+    let csvContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n";
+    csvContent += `"${record.faculty}","${record.className}","${record.userId}","${record.userName}","${record.assessment}",${record.score},${record.totalQuestions},"${record.percentage}%","${record.timestamp}"\n`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
