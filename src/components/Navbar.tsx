@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'module3', label: 'Lectures & Manifolds (Module 3)', icon: <BookOpen className="w-4 h-4" />, badge: 'Mod 3' },
     { id: 'module4', label: 'Lectures & Manifolds (Module 4)', icon: <BookOpen className="w-4 h-4" />, badge: 'Mod 4' },
     { id: 'module5', label: 'Lectures & Manifolds (Module 5)', icon: <BookOpen className="w-4 h-4" />, badge: 'Mod 5' },
-    { id: 'scores', label: 'Scores & CSV Logs', icon: <FileSpreadsheet className="w-4 h-4" />, badge: 'CSV Data' },
+    { id: 'scores', label: 'Student Results & Analysis', icon: <FileSpreadsheet className="w-4 h-4 text-[#dc2626]" />, badge: 'STUDENT RESULTS' },
     { id: '3.2', label: 'Visual Simulators', icon: <PlayCircle className="w-4 h-4" />, badge: 'Interactive' },
     { id: '4.1', label: 'Pumping Lemma Game', icon: <Cpu className="w-4 h-4" /> },
     { id: '4.4', label: 'DFA Minimization', icon: <Sparkles className="w-4 h-4" /> },
@@ -141,6 +141,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {currentUser.role === 'faculty' ? 'Faculty:' : 'Student:'} {currentUser.name}
               </span>
               <span className="text-xs bg-black/20 px-1.5 py-0.5 rounded font-mono uppercase">Custom ID</span>
+            </button>
+
+            {/* Dedicated STUDENT RESULTS Button */}
+            <button
+              onClick={() => onSelectSection('scores')}
+              className={`px-3.5 py-2 rounded-md text-xs md:text-sm font-mono font-extrabold flex items-center space-x-1.5 border-2 shadow-sm transition-all ${
+                activeSection === 'scores'
+                  ? 'bg-[#991b1b] text-white border-[#991b1b]'
+                  : 'bg-red-50 text-[#991b1b] border-red-300 hover:bg-red-100'
+              }`}
+              title="Open Faculty Result Dashboard & Student Analytics"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-amber-500" />
+              <span>STUDENT RESULTS</span>
             </button>
 
             {/* Dedicated Logout / Portal Page Button */}

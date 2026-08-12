@@ -18,55 +18,88 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 // In-memory score store with safe file backup
 import fs from "fs";
 
-let scoresStore: any[] = [
+let scoresStore: any[] = [];
+
+// In-memory student store with safe file backup
+let studentsStore: any[] = [];
+
+// In-memory faculty store with safe file backup
+let facultyStore: any[] = [
   {
-    id: 'score_1',
-    faculty: 'Prof. Dr. Pushpa Mohan',
-    className: 'CSE-A',
-    userId: '1VT22CS001',
-    userName: 'Rahul Sharma',
-    userRole: 'student',
-    assessment: 'Module 1 Quiz',
-    moduleNumber: 1,
-    score: 5,
-    totalQuestions: 6,
-    percentage: 83,
-    timestamp: '2026-08-11',
-    userAnswers: {}
+    id: 'FAC_CSE_101',
+    name: 'Prof. Dr. Pushpa Mohan',
+    department: 'Computer Science & Engineering',
+    designation: 'Professor & HOD'
   },
   {
-    id: 'score_2',
-    faculty: 'Prof. Dr. Pushpa Mohan',
-    className: 'CSE-A',
-    userId: '1VT22CS002',
-    userName: 'Priya Ananth',
-    userRole: 'student',
-    assessment: 'Module 1 Quiz',
-    moduleNumber: 1,
-    score: 6,
-    totalQuestions: 6,
-    percentage: 100,
-    timestamp: '2026-08-11',
-    userAnswers: {}
+    id: 'FAC_CSE_102',
+    name: 'Dr. Rajesh Kumar',
+    department: 'Computer Science & Engineering',
+    designation: 'Associate Professor'
   },
   {
-    id: 'score_3',
-    faculty: 'Prof. Dr. Pushpa Mohan',
-    className: 'CSE-B',
-    userId: '1VT22CS003',
-    userName: 'Karthik V',
-    userRole: 'student',
-    assessment: 'Module 2 Quiz',
-    moduleNumber: 2,
-    score: 4,
-    totalQuestions: 5,
-    percentage: 80,
-    timestamp: '2026-08-12',
-    userAnswers: {}
+    id: 'FAC_ISE_103',
+    name: 'Prof. Anitha Rao',
+    department: 'Information Science & Engineering',
+    designation: 'Assistant Professor'
   }
 ];
 
-// Helper to safely load file scores
+try {
+  const facultyFilePath = path.join(process.cwd(), 'faculty.json');
+  if (fs.existsSync(facultyFilePath)) {
+    const raw = fs.readFileSync(facultyFilePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      facultyStore = parsed;
+    }
+  }
+} catch (e) {
+  console.log("Faculty file load info:", e);
+}
+
+const saveFacultyToFile = (facultyList: any[]) => {
+  try {
+    const facultyFilePath = path.join(process.cwd(), 'faculty.json');
+    fs.writeFileSync(facultyFilePath, JSON.stringify(facultyList, null, 2));
+
+    let csvContent = "Faculty ID,Faculty Name,Department,Designation\n";
+    facultyList.forEach(f => {
+      csvContent += `"${f.id}","${f.name}","${f.department || 'Computer Science & Engineering'}","${f.designation || 'Professor'}"\n`;
+    });
+    fs.writeFileSync(path.join(process.cwd(), 'faculty.csv'), csvContent);
+  } catch (e) {
+    console.log("Safe persistent write notice for faculty:", e);
+  }
+};
+
+try {
+  const studentsFilePath = path.join(process.cwd(), 'students.json');
+  if (fs.existsSync(studentsFilePath)) {
+    const raw = fs.readFileSync(studentsFilePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      studentsStore = parsed;
+    }
+  }
+} catch (e) {
+  console.log("Students file load info:", e);
+}
+
+const saveStudentsToFile = (students: any[]) => {
+  try {
+    const studentsFilePath = path.join(process.cwd(), 'students.json');
+    fs.writeFileSync(studentsFilePath, JSON.stringify(students, null, 2));
+
+    let csvContent = "USN,Student Name,Semester,Class,Assigned Faculty\n";
+    students.forEach(s => {
+      csvContent += `"${s.id}","${s.name}","${s.sem || '5th Semester CSE'}","${s.className || 'CSE-A'}","${s.assignedFaculty || 'Prof. Dr. Pushpa Mohan'}"\n`;
+    });
+    fs.writeFileSync(path.join(process.cwd(), 'students.csv'), csvContent);
+  } catch (e) {
+    console.log("Safe persistent write notice for students:", e);
+  }
+};
 try {
   const scoresFilePath = path.join(process.cwd(), 'scores.json');
   if (fs.existsSync(scoresFilePath)) {
@@ -146,8 +179,11 @@ function parseCsvToRecords(csvText: string): any[] {
       const percentage = parseInt(pctStr, 10) || Math.round((score / (totalQuestions || 1)) * 100);
       const timestamp = cols[8] || new Date().toISOString().slice(0, 10);
 
-      records.push({
-        id: `score_${userId}_${assessment.replace(/\s+/g, '')}_${i}`,
+      const targetUserId = userId.trim().toLowerCase();
+      const targetAssessment = assessment.trim().toLowerCase();
+
+      const rec = {
+        id: `score_${userId}_${assessment.replace(/\s+/g, '')}`,
         faculty,
         className,
         userId,
@@ -160,7 +196,18 @@ function parseCsvToRecords(csvText: string): any[] {
         percentage,
         timestamp,
         userAnswers: {}
-      });
+      };
+
+      // Find existing record matching same Student ID + Assessment -> replace with latest
+      const matchIdx = records.findIndex(
+        r => (r.userId || '').trim().toLowerCase() === targetUserId &&
+             (r.assessment || '').trim().toLowerCase() === targetAssessment
+      );
+      if (matchIdx >= 0) {
+        records[matchIdx] = rec;
+      } else {
+        records.push(rec);
+      }
     }
   }
   return records;
@@ -190,12 +237,14 @@ async function fetchScoresFromGitHub() {
     return null;
   }
 
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/scores.csv?ref=${GITHUB_BRANCH}`;
+  const timestamp = Date.now();
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/scores.csv?ref=${GITHUB_BRANCH}&t=${timestamp}`;
   const res = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${GITHUB_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Vercel-Scores-App'
+      'User-Agent': 'Vercel-Scores-App',
+      'Cache-Control': 'no-cache, no-store'
     }
   });
 
@@ -224,7 +273,7 @@ async function fetchScoresFromGitHub() {
   };
 }
 
-async function appendScoreToGitHubCSV(formattedRecord: any) {
+async function upsertScoreToGitHubCSV(formattedRecord: any) {
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   const GITHUB_OWNER = process.env.GITHUB_OWNER;
   const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -240,18 +289,33 @@ async function appendScoreToGitHubCSV(formattedRecord: any) {
       const githubFile = await fetchScoresFromGitHub();
       if (!githubFile) return null;
 
-      let currentContent = githubFile.content;
-      if (!currentContent.endsWith('\n') && currentContent.length > 0) {
-        currentContent += '\n';
+      let currentRecords = parseCsvToRecords(githubFile.content || '');
+
+      const targetUserId = (formattedRecord.userId || '').trim().toLowerCase();
+      const targetAssessment = (formattedRecord.assessment || '').trim().toLowerCase();
+
+      // Find existing record with same Student ID + same Assessment
+      const matchIndex = currentRecords.findIndex(
+        r => (r.userId || '').trim().toLowerCase() === targetUserId &&
+             (r.assessment || '').trim().toLowerCase() === targetAssessment
+      );
+
+      if (matchIndex >= 0) {
+        currentRecords[matchIndex] = {
+          ...currentRecords[matchIndex],
+          ...formattedRecord,
+          id: currentRecords[matchIndex].id || formattedRecord.id
+        };
+      } else {
+        currentRecords.push(formattedRecord);
       }
 
-      if (!currentContent.toLowerCase().includes('faculty')) {
-        currentContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n" + currentContent;
-      }
+      let csvContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n";
+      currentRecords.forEach(r => {
+        csvContent += recordToCsvRow(r) + '\n';
+      });
 
-      const newRow = recordToCsvRow(formattedRecord);
-      const updatedContent = currentContent + newRow + '\n';
-      const encodedContent = Buffer.from(updatedContent, 'utf-8').toString('base64');
+      const encodedContent = Buffer.from(csvContent, 'utf-8').toString('base64');
 
       const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/scores.csv`;
       const bodyPayload: any = {
@@ -275,8 +339,8 @@ async function appendScoreToGitHubCSV(formattedRecord: any) {
       });
 
       if (putRes.ok) {
-        console.log(`Successfully committed score to GitHub scores.csv (Attempt ${attempt})`);
-        return parseCsvToRecords(updatedContent);
+        console.log(`Successfully committed updated score to GitHub scores.csv (Attempt ${attempt})`);
+        return currentRecords;
       }
 
       if (putRes.status === 409 || putRes.status === 422) {
@@ -297,7 +361,7 @@ async function appendScoreToGitHubCSV(formattedRecord: any) {
     }
   }
 
-  throw new Error("Failed to append score to GitHub scores.csv after max retries");
+  throw new Error("Failed to update score in GitHub scores.csv after max retries");
 }
 
 async function saveAllRecordsToGitHubCSV(records: any[]) {
@@ -365,9 +429,13 @@ app.get("/api/scores", async (req, res) => {
     const githubData = await fetchScoresFromGitHub();
     let records = scoresStore;
 
-    if (githubData && githubData.content) {
-      records = parseCsvToRecords(githubData.content);
-      scoresStore = records;
+    if (githubData) {
+      if (githubData.content) {
+        records = parseCsvToRecords(githubData.content);
+        scoresStore = records;
+      } else if (!githubData.exists) {
+        records = [];
+      }
     }
 
     const { faculty, className, assessment } = req.query;
@@ -383,10 +451,27 @@ app.get("/api/scores", async (req, res) => {
       result = result.filter(s => (s.assessment || '').toLowerCase() === String(assessment).toLowerCase());
     }
 
+    const isGithubConfigured = Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO);
+
+    if (!isGithubConfigured) {
+      return res.json({
+        scores: result,
+        notice: "Results are available after deployment to Vercel.",
+        isGithubConfigured: false
+      });
+    }
+
     res.json(result);
   } catch (e: any) {
     console.error("GET /api/scores error:", e);
-    res.json(scoresStore);
+    if (process.env.GITHUB_TOKEN) {
+      return res.status(500).json({ error: "Unable to load results. Please try again." });
+    }
+    res.json({
+      scores: scoresStore,
+      notice: "Results are available after deployment to Vercel.",
+      isGithubConfigured: false
+    });
   }
 });
 
@@ -413,17 +498,24 @@ app.post("/api/scores", async (req, res) => {
       userAnswers: record.userAnswers || {}
     };
 
-    const githubRecords = await appendScoreToGitHubCSV(formattedRecord);
+    const githubRecords = await upsertScoreToGitHubCSV(formattedRecord);
     if (githubRecords) {
       scoresStore = githubRecords;
       return res.json({ success: true, score: formattedRecord, allScores: githubRecords, storage: 'github' });
     }
 
-    // Remove any previous attempt by the same student for this assessment
-    scoresStore = scoresStore.filter(
-      s => !(s.userId === formattedRecord.userId && s.assessment === formattedRecord.assessment)
+    // Fallback if GitHub credentials not provided (upsert record matching Student ID + Assessment)
+    const targetUserId = (formattedRecord.userId || '').trim().toLowerCase();
+    const targetAssessment = (formattedRecord.assessment || '').trim().toLowerCase();
+    const matchIdx = scoresStore.findIndex(
+      s => (s.userId || '').trim().toLowerCase() === targetUserId &&
+           (s.assessment || '').trim().toLowerCase() === targetAssessment
     );
-    scoresStore.push(formattedRecord);
+    if (matchIdx >= 0) {
+      scoresStore[matchIdx] = formattedRecord;
+    } else {
+      scoresStore.push(formattedRecord);
+    }
 
     saveScoresToFile(scoresStore);
     res.json({ success: true, score: formattedRecord, allScores: scoresStore, storage: 'local-fallback' });
@@ -443,6 +535,130 @@ app.delete("/api/scores", async (req, res) => {
   saveScoresToFile(scoresStore);
   await saveAllRecordsToGitHubCSV(scoresStore);
   res.json({ success: true, scores: scoresStore });
+});
+
+// Student Roster API Routes
+app.get("/api/students", (req, res) => {
+  try {
+    // Extract any student unique IDs from scoresStore to ensure all students who have taken quizzes are also in studentsStore
+    const studentMap = new Map<string, any>();
+    studentsStore.forEach(s => studentMap.set(s.id.toUpperCase(), s));
+
+    scoresStore.forEach(s => {
+      const usn = (s.userId || '').trim().toUpperCase();
+      if (usn && !studentMap.has(usn)) {
+        studentMap.set(usn, {
+          id: usn,
+          name: s.userName || 'Student',
+          sem: '5th Semester CSE',
+          className: s.className || 'CSE-A',
+          assignedFaculty: s.faculty || 'Prof. Dr. Pushpa Mohan'
+        });
+      }
+    });
+
+    const merged = Array.from(studentMap.values());
+    studentsStore = merged;
+    saveStudentsToFile(merged);
+    res.json({ students: merged });
+  } catch (e: any) {
+    res.json({ students: studentsStore });
+  }
+});
+
+app.post("/api/students", (req, res) => {
+  try {
+    const { id, name, sem, className, assignedFaculty } = req.body || {};
+    if (!id || !name) {
+      return res.status(400).json({ error: "Missing required Student USN (id) or Full Name (name)" });
+    }
+
+    const cleanUsn = String(id).trim().toUpperCase();
+    const cleanName = String(name).trim();
+
+    const formatted = {
+      id: cleanUsn,
+      name: cleanName,
+      sem: sem ? String(sem).trim() : '5th Semester CSE',
+      className: className ? String(className).trim() : 'CSE-A',
+      assignedFaculty: assignedFaculty ? String(assignedFaculty).trim() : 'Prof. Dr. Pushpa Mohan',
+      addedAt: new Date().toISOString().slice(0, 10)
+    };
+
+    const matchIdx = studentsStore.findIndex(s => s.id.toUpperCase() === cleanUsn);
+    if (matchIdx >= 0) {
+      studentsStore[matchIdx] = { ...studentsStore[matchIdx], ...formatted };
+    } else {
+      studentsStore.unshift(formatted);
+    }
+
+    saveStudentsToFile(studentsStore);
+    res.json({ success: true, student: formatted, students: studentsStore });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Failed to save student" });
+  }
+});
+
+app.delete("/api/students", (req, res) => {
+  try {
+    const { id } = req.query;
+    if (id) {
+      const cleanId = String(id).trim().toUpperCase();
+      studentsStore = studentsStore.filter(s => s.id.toUpperCase() !== cleanId);
+      // Also delete score records for this student
+      scoresStore = scoresStore.filter(s => (s.userId || '').trim().toUpperCase() !== cleanId);
+      saveScoresToFile(scoresStore);
+    } else {
+      studentsStore = [];
+      scoresStore = [];
+      saveScoresToFile(scoresStore);
+    }
+    saveStudentsToFile(studentsStore);
+    res.json({ success: true, students: studentsStore });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Failed to delete student" });
+  }
+});
+
+// Faculty Roster API Routes
+app.get("/api/faculty", (req, res) => {
+  try {
+    res.json({ faculty: facultyStore });
+  } catch (e: any) {
+    res.json({ faculty: facultyStore });
+  }
+});
+
+app.post("/api/faculty", (req, res) => {
+  try {
+    const { id, name, department, designation } = req.body || {};
+    if (!id || !name) {
+      return res.status(400).json({ error: "Missing required Faculty ID (id) or Full Name (name)" });
+    }
+
+    const cleanId = String(id).trim().toUpperCase();
+    const cleanName = String(name).trim();
+
+    const formatted = {
+      id: cleanId,
+      name: cleanName,
+      department: department ? String(department).trim() : 'Computer Science & Engineering',
+      designation: designation ? String(designation).trim() : 'Professor / Faculty Member',
+      addedAt: new Date().toISOString().slice(0, 10)
+    };
+
+    const matchIdx = facultyStore.findIndex(f => f.id.toUpperCase() === cleanId);
+    if (matchIdx >= 0) {
+      facultyStore[matchIdx] = { ...facultyStore[matchIdx], ...formatted };
+    } else {
+      facultyStore.unshift(formatted);
+    }
+
+    saveFacultyToFile(facultyStore);
+    res.json({ success: true, facultyMember: formatted, faculty: facultyStore });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Failed to save faculty" });
+  }
 });
 
 // API Endpoints

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { CURRICULUM_SECTIONS } from '../data/curriculumData';
 import { VTU_QUESTION_BANKS, MODULE_QUIZZES } from '../data/vtuData';
 import { UserProfile, QuizScoreRecord } from '../types';
-import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, GraduationCap, Play, Download, HelpCircle, Award, Lock, Unlock, ShieldAlert, FileSpreadsheet, Check } from 'lucide-react';
+import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, GraduationCap, Play, Download, HelpCircle, Award, Lock, Unlock, ShieldAlert, FileSpreadsheet, Check, UserCheck } from 'lucide-react';
 
 interface ModuleViewProps {
   moduleNumber: 1 | 2 | 3 | 4 | 5;
@@ -204,10 +204,18 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
     try {
       const stored = localStorage.getItem('vtu_quiz_scores');
       const existingScores: QuizScoreRecord[] = stored ? JSON.parse(stored) : [];
-      // Remove any prior attempt if re-submitting by faculty override
-      const filtered = existingScores.filter(s => !(s.userId === currentUser.id && s.moduleNumber === moduleNumber));
-      filtered.push(record);
-      localStorage.setItem('vtu_quiz_scores', JSON.stringify(filtered));
+      const targetUserId = (record.userId || '').trim().toLowerCase();
+      const targetAssessment = (record.assessment || '').trim().toLowerCase();
+      const matchIdx = existingScores.findIndex(
+        s => (s.userId || '').trim().toLowerCase() === targetUserId &&
+             (s.assessment || '').trim().toLowerCase() === targetAssessment
+      );
+      if (matchIdx >= 0) {
+        existingScores[matchIdx] = record;
+      } else {
+        existingScores.push(record);
+      }
+      localStorage.setItem('vtu_quiz_scores', JSON.stringify(existingScores));
       setExistingAttemptRecord(record);
       setSubmittedQuiz(true);
 
@@ -218,8 +226,8 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
         body: JSON.stringify(record)
       }).catch(err => console.error('Failed to sync score to server API:', err));
 
-      // Download CSV score record
-      downloadSingleScoreCSV(record);
+      // Note: Score is saved directly to portal database & local storage.
+      // CSV Export is reserved for Faculty members in the Scores Result Dashboard.
     } catch (e) {
       console.error(e);
     }
@@ -242,6 +250,35 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-8" ref={contentRef}>
+      {/* Faculty Portal Notice Banner */}
+      {currentUser.role === 'faculty' && (
+        <div className="bg-red-50 border-2 border-red-200 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-[#991b1b] text-white rounded-lg">
+              <UserCheck className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <span className="font-mono font-extrabold text-xs text-[#991b1b] uppercase block">
+                Faculty Portal Mode • {currentUser.name}
+              </span>
+              <p className="text-sm font-serif font-bold text-[#0F172A]">
+                Manage question bank answer permissions or analyze student performance records.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const ev = new CustomEvent('switch-section', { detail: 'scores' });
+              window.dispatchEvent(ev);
+            }}
+            className="bg-[#991b1b] hover:bg-[#7f1d1d] text-white px-4 py-2.5 rounded-lg text-xs md:text-sm font-mono font-extrabold uppercase tracking-wider flex items-center space-x-2 shadow-xs shrink-0"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+            <span>STUDENT RESULTS</span>
+          </button>
+        </div>
+      )}
+
       {/* Hero Banner */}
       <div className="bg-white text-[#0F172A] rounded-xl p-8 shadow-md border-2 border-slate-200 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="relative z-10 max-w-3xl space-y-3">

@@ -98,8 +98,11 @@ function parseCsvToRecords(csvText: string): any[] {
       const percentage = parseInt(pctStr, 10) || Math.round((score / (totalQuestions || 1)) * 100);
       const timestamp = cols[8] || new Date().toISOString().slice(0, 10);
 
-      records.push({
-        id: `score_${userId}_${assessment.replace(/\s+/g, '')}_${i}`,
+      const targetUserId = userId.trim().toLowerCase();
+      const targetAssessment = assessment.trim().toLowerCase();
+
+      const rec = {
+        id: `score_${userId}_${assessment.replace(/\s+/g, '')}`,
         faculty,
         className,
         userId,
@@ -112,7 +115,18 @@ function parseCsvToRecords(csvText: string): any[] {
         percentage,
         timestamp,
         userAnswers: {}
-      });
+      };
+
+      // Find existing record matching same Student ID + Assessment -> replace with latest
+      const matchIdx = records.findIndex(
+        r => (r.userId || '').trim().toLowerCase() === targetUserId &&
+             (r.assessment || '').trim().toLowerCase() === targetAssessment
+      );
+      if (matchIdx >= 0) {
+        records[matchIdx] = rec;
+      } else {
+        records.push(rec);
+      }
     }
   }
   return records;
@@ -143,12 +157,14 @@ async function fetchScoresFromGitHub() {
     return null;
   }
 
-  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/scores.csv?ref=${GITHUB_BRANCH}`;
+  const timestamp = Date.now();
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/scores.csv?ref=${GITHUB_BRANCH}&t=${timestamp}`;
   const res = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${GITHUB_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Vercel-Scores-App'
+      'User-Agent': 'Vercel-Scores-App',
+      'Cache-Control': 'no-cache, no-store'
     }
   });
 
@@ -177,7 +193,7 @@ async function fetchScoresFromGitHub() {
   };
 }
 
-async function appendScoreToGitHubCSV(formattedRecord: any) {
+async function upsertScoreToGitHubCSV(formattedRecord: any) {
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   const GITHUB_OWNER = process.env.GITHUB_OWNER;
   const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -193,18 +209,33 @@ async function appendScoreToGitHubCSV(formattedRecord: any) {
       const githubFile = await fetchScoresFromGitHub();
       if (!githubFile) return null;
 
-      let currentContent = githubFile.content;
-      if (!currentContent.endsWith('\n') && currentContent.length > 0) {
-        currentContent += '\n';
+      let currentRecords = parseCsvToRecords(githubFile.content || '');
+
+      const targetUserId = (formattedRecord.userId || '').trim().toLowerCase();
+      const targetAssessment = (formattedRecord.assessment || '').trim().toLowerCase();
+
+      // Find existing record with same Student ID + same Assessment
+      const matchIndex = currentRecords.findIndex(
+        r => (r.userId || '').trim().toLowerCase() === targetUserId &&
+             (r.assessment || '').trim().toLowerCase() === targetAssessment
+      );
+
+      if (matchIndex >= 0) {
+        currentRecords[matchIndex] = {
+          ...currentRecords[matchIndex],
+          ...formattedRecord,
+          id: currentRecords[matchIndex].id || formattedRecord.id
+        };
+      } else {
+        currentRecords.push(formattedRecord);
       }
 
-      if (!currentContent.toLowerCase().includes('faculty')) {
-        currentContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n" + currentContent;
-      }
+      let csvContent = "Faculty,Class,Student ID,Student Name,Assessment,Score,Total,Percentage,Date\n";
+      currentRecords.forEach(r => {
+        csvContent += recordToCsvRow(r) + '\n';
+      });
 
-      const newRow = recordToCsvRow(formattedRecord);
-      const updatedContent = currentContent + newRow + '\n';
-      const encodedContent = Buffer.from(updatedContent, 'utf-8').toString('base64');
+      const encodedContent = Buffer.from(csvContent, 'utf-8').toString('base64');
 
       const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/scores.csv`;
       const bodyPayload: any = {
@@ -228,8 +259,8 @@ async function appendScoreToGitHubCSV(formattedRecord: any) {
       });
 
       if (putRes.ok) {
-        console.log(`Successfully committed score to GitHub scores.csv (Attempt ${attempt})`);
-        return parseCsvToRecords(updatedContent);
+        console.log(`Successfully committed updated score to GitHub scores.csv (Attempt ${attempt})`);
+        return currentRecords;
       }
 
       if (putRes.status === 409 || putRes.status === 422) {
@@ -250,7 +281,7 @@ async function appendScoreToGitHubCSV(formattedRecord: any) {
     }
   }
 
-  throw new Error("Failed to append score to GitHub scores.csv after max retries");
+  throw new Error("Failed to update score in GitHub scores.csv after max retries");
 }
 
 async function saveAllRecordsToGitHubCSV(records: any[]) {
@@ -331,9 +362,13 @@ export default async function handler(req: any, res: any) {
       const githubData = await fetchScoresFromGitHub();
       let records = serverlessScoresCache;
 
-      if (githubData && githubData.content) {
-        records = parseCsvToRecords(githubData.content);
-        serverlessScoresCache = records;
+      if (githubData) {
+        if (githubData.content) {
+          records = parseCsvToRecords(githubData.content);
+          serverlessScoresCache = records;
+        } else if (!githubData.exists) {
+          records = [];
+        }
       }
 
       const { faculty, className, assessment } = req.query || {};
@@ -349,10 +384,27 @@ export default async function handler(req: any, res: any) {
         result = result.filter(s => (s.assessment || '').toLowerCase() === String(assessment).toLowerCase());
       }
 
+      const isGithubConfigured = Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO);
+
+      if (!isGithubConfigured) {
+        return res.status(200).json({
+          scores: result,
+          notice: "Results are available after deployment to Vercel.",
+          isGithubConfigured: false
+        });
+      }
+
       return res.status(200).json(result);
     } catch (e: any) {
       console.error("GET /api/scores error:", e);
-      return res.status(200).json(serverlessScoresCache);
+      if (process.env.GITHUB_TOKEN) {
+        return res.status(500).json({ error: "Unable to load results. Please try again." });
+      }
+      return res.status(200).json({
+        scores: serverlessScoresCache,
+        notice: "Results are available after deployment to Vercel.",
+        isGithubConfigured: false
+      });
     }
   }
 
@@ -379,7 +431,7 @@ export default async function handler(req: any, res: any) {
         userAnswers: record.userAnswers || {}
       };
 
-      const githubRecords = await appendScoreToGitHubCSV(formattedRecord);
+      const githubRecords = await upsertScoreToGitHubCSV(formattedRecord);
       if (githubRecords) {
         serverlessScoresCache = githubRecords;
         return res.status(200).json({
@@ -390,11 +442,18 @@ export default async function handler(req: any, res: any) {
         });
       }
 
-      // Fallback if GitHub credentials not provided
-      serverlessScoresCache = serverlessScoresCache.filter(
-        s => !(s.userId === formattedRecord.userId && s.assessment === formattedRecord.assessment)
+      // Fallback if GitHub credentials not provided (upsert record matching Student ID + Assessment)
+      const targetUserId = (formattedRecord.userId || '').trim().toLowerCase();
+      const targetAssessment = (formattedRecord.assessment || '').trim().toLowerCase();
+      const matchIdx = serverlessScoresCache.findIndex(
+        s => (s.userId || '').trim().toLowerCase() === targetUserId &&
+             (s.assessment || '').trim().toLowerCase() === targetAssessment
       );
-      serverlessScoresCache.push(formattedRecord);
+      if (matchIdx >= 0) {
+        serverlessScoresCache[matchIdx] = formattedRecord;
+      } else {
+        serverlessScoresCache.push(formattedRecord);
+      }
 
       return res.status(200).json({
         success: true,

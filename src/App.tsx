@@ -50,6 +50,12 @@ export default function App() {
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    if (user.role === 'student') {
+      setActiveSection('module1');
+    } else if (user.role === 'faculty') {
+      setActiveSection('scores');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       localStorage.setItem('vtu_user_profile', JSON.stringify(user));
     } catch (e) {
@@ -59,6 +65,12 @@ export default function App() {
 
   const handleSelectUser = (user: UserProfile) => {
     setCurrentUser(user);
+    if (user.role === 'student') {
+      setActiveSection('module1');
+    } else if (user.role === 'faculty') {
+      setActiveSection('scores');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       localStorage.setItem('vtu_user_profile', JSON.stringify(user));
     } catch (e) {
@@ -83,8 +95,21 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleSwitchSection = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const sec = customEvent.detail as SectionId;
+      if (sec) {
+        setActiveSection(sec);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
     window.addEventListener('switch-module', handleSwitchModule);
-    return () => window.removeEventListener('switch-module', handleSwitchModule);
+    window.addEventListener('switch-section', handleSwitchSection);
+    return () => {
+      window.removeEventListener('switch-module', handleSwitchModule);
+      window.removeEventListener('switch-section', handleSwitchSection);
+    };
   }, []);
 
   const handleSelectSection = (id: SectionId) => {

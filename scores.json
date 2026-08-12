@@ -1,0 +1,30 @@
+[
+  {
+    "id": "score_1VT22CS006_mod1_1786556548752",
+    "faculty": "Prof. Dr. Pushpa Mohan",
+    "className": "5th Semester CSE",
+    "userId": "1VT22CS006",
+    "userName": "SHARMA",
+    "userRole": "student",
+    "assessment": "Module 1 Quiz",
+    "moduleNumber": 1,
+    "score": 8,
+    "totalQuestions": 12,
+    "percentage": 67,
+    "timestamp": "2026-08-12",
+    "userAnswers": {
+      "q1_st1": 3,
+      "q1_st2": 2,
+      "q1_st3": 1,
+      "q1_st4": 1,
+      "q1_st5": 1,
+      "q1_1": 3,
+      "q1_2": 1,
+      "q1_3": 1,
+      "q1_4": 1,
+      "q1_5": 2,
+      "q1_6": 2,
+      "q1_7": 1
+    }
+  }
+]

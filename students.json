@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1VT22CS007",
+    "name": "RAGHU",
+    "sem": "5th Semester CSE",
+    "className": "CSE-C",
+    "assignedFaculty": "Prof. Dr. Pushpa Mohan",
+    "addedAt": "2026-08-12"
+  },
+  {
+    "id": "1VT22CS006",
+    "name": "SHARMA",
+    "sem": "5th Semester CSE",
+    "className": "CSE-A",
+    "assignedFaculty": "Prof. Dr. Pushpa Mohan",
+    "addedAt": "2026-08-12"
+  }
+]
