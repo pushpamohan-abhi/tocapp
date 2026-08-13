@@ -469,7 +469,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
         {/* STUDENT & FACULTY REGISTRATION FORM MODAL / COLLAPSIBLE */}
         {isRegistering && (
-          <div className="max-w-3xl mx-auto w-full bg-amber-50/95 border-2 border-amber-400 p-6 rounded-xl shadow-lg space-y-4">
+          <div className="max-w-3xl mx-auto w-full bg-amber-50/95 border-2 border-amber-400 p-4 md:p-6 rounded-xl shadow-lg space-y-4">
             <div className="flex justify-between items-center border-b border-amber-300 pb-3">
               <div className="flex items-center space-x-2 text-amber-900">
                 <UserPlus className="w-5 h-5 text-amber-700" />
@@ -796,11 +796,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         </div>
 
         {/* Custom Institutional ID Login Section */}
-        <div className="max-w-3xl mx-auto w-full bg-white border-2 border-slate-300 rounded-xl p-8 shadow-md space-y-6">
+        <div className="max-w-3xl mx-auto w-full bg-white border-2 border-slate-300 rounded-xl p-4 md:p-8 shadow-md space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-slate-200 pb-4 gap-4">
             <div>
-              <h3 className="font-serif italic text-2xl text-[#0F172A] font-extrabold">Custom Institutional Credentials</h3>
-              <p className="text-sm font-semibold text-slate-600">Sign in using your official VTU USN or Faculty ID number</p>
+              <h3 className="font-serif italic text-xl md:text-2xl text-[#0F172A] font-extrabold">Custom Institutional Credentials</h3>
+              <p className="text-xs md:text-sm font-semibold text-slate-600">Sign in using your official VTU USN or Faculty ID number</p>
             </div>
 
             <div className="flex bg-slate-100 p-1.5 rounded-lg border-2 border-slate-200">

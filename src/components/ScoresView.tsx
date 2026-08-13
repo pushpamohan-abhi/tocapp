@@ -395,7 +395,7 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
       {/* Header Banner */}
-      <div className="bg-[#F8F6F2] border border-[#1A1A1A]/10 rounded-sm p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xs">
+      <div className="bg-[#F8F6F2] border border-[#1A1A1A]/10 rounded-sm p-4 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xs">
         <div className="space-y-2">
           <div className="inline-flex items-center space-x-2 bg-[#991b1b] text-white px-2.5 py-0.5 rounded-sm text-[10px] font-mono font-bold uppercase tracking-widest">
             <FileSpreadsheet className="w-3.5 h-3.5" />

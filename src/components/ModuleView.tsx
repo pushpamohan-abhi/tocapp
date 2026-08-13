@@ -174,59 +174,6 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
     }
   };
 
-  const openQuizMarkdownAndPrintPdf = (overrideRecord?: QuizScoreRecord | null) => {
-    const activeRec = overrideRecord !== undefined ? overrideRecord : existingAttemptRecord;
-    let content = `# VTU QUIZ ATTEMPT & QUESTION REPORT - ${moduleTitle}\n`;
-    content += `Student/Faculty: ${currentUser.name} (${currentUser.role})\n`;
-    content += `ID / USN: ${currentUser.id}\n`;
-    content += `Timestamp: ${activeRec ? activeRec.timestamp : 'Not Attempted'}\n`;
-    content += `Score: ${activeRec ? `${activeRec.score} / ${moduleQuizzes.length} (${activeRec.percentage}%)` : '0 / 0 (0%)'}\n\n`;
-    content += `==================================================\n\n`;
-
-    moduleQuizzes.forEach((q, idx) => {
-      content += `### Q${idx + 1}: ${q.question}\n`;
-      const studentAnsIdx = activeRec?.userAnswers ? activeRec.userAnswers[q.id] : undefined;
-      q.options.forEach((opt, oIdx) => {
-        const isUserChoice = Number(studentAnsIdx) === oIdx;
-        const isCorrect = q.correctIndex === oIdx;
-        let statusText = '';
-        let marker = '[ ]';
-
-        if (isUserChoice) {
-          marker = '[X]';
-          statusText = isCorrect ? ' - [✓ YOUR ANSWER: CORRECT]' : ' - [✗ YOUR ANSWER: INCORRECT]';
-        } else if (isCorrect) {
-          marker = '[✓]';
-          statusText = ' - [CORRECT ANSWER]';
-        }
-
-        content += `  ${marker} ${opt}${statusText}\n`;
-      });
-      content += `\n`;
-    });
-
-    const printWin = window.open('', '_blank');
-    if (printWin) {
-      printWin.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Quiz Report - ${moduleTitle} - Print PDF</title>
-            <style>
-              body { font-family: 'Courier New', Courier, monospace; padding: 40px; background: #fff; color: #111; line-height: 1.6; white-space: pre-wrap; font-size: 13px; }
-              h1 { font-size: 20px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
-              h3 { font-size: 14px; margin-top: 15px; color: #333; font-weight: bold; }
-              @media print { body { padding: 15px; } }
-            </style>
-          </head>
-          <body>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-            <script>window.onload = function() { window.print(); };</script>
-          </body>
-        </html>
-      `);
-      printWin.document.close();
-    }
-  };
 
   const openMarkdownAndPrintPdf = () => {
     let content = `# ${moduleTitle}\n${ullmanSubtitle}\n\n`;
@@ -488,6 +435,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
 
   // Submit Quiz Action (Generates CSV Record & Locks Attempt)
   const handleSubmitQuiz = () => {
+    console.log("Submit Quiz clicked, selectedAnswers:", selectedAnswers);
     if (Object.keys(selectedAnswers).length < moduleQuizzes.length) {
       if (!window.confirm("You have unattempted questions. Are you sure you want to submit your quiz attempt now?")) {
         return;
@@ -526,7 +474,9 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
     try {
       setExistingAttemptRecord(record);
       setSubmittedQuiz(true);
-
+      
+      // Auto-open PDF report upon submission
+      
       if (currentUser.role === 'faculty') {
         // Faculty quiz scores are not saved to student scores CSV/database
         return;
@@ -656,14 +606,6 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
             <span>Q-Bank With Ans (.md & PDF)</span>
           </button>
 
-          <button
-            onClick={openQuizMarkdownAndPrintPdf}
-            className="bg-[#1e293b] hover:bg-black text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
-            title="Open Quiz Report as .md and Print / Save PDF"
-          >
-            <Award className="w-4 h-4 text-amber-300" />
-            <span>Quiz Report (.md & PDF)</span>
-          </button>
         </div>
       </div>
 
@@ -1071,13 +1013,13 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
                         </div>
 
                         {submittedQuiz && isCorrect && (
-                          <span className="text-xs bg-emerald-300 text-emerald-950 font-mono font-extrabold px-2.5 py-1 rounded">
-                            Correct Answer
+                          <span className="text-xs font-mono font-extrabold px-2.5 py-1" style={{ color: "#059669", fontSize: "16px" }}>
+                            ✅
                           </span>
                         )}
                         {submittedQuiz && isSelected && !isCorrect && (
-                          <span className="text-xs bg-rose-300 text-rose-950 font-mono font-extrabold px-2.5 py-1 rounded">
-                            Your Choice
+                          <span className="text-xs font-mono font-extrabold px-2.5 py-1" style={{ color: "#dc2626", fontSize: "16px" }}>
+                            ❌
                           </span>
                         )}
                       </button>
@@ -1096,7 +1038,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
             ))}
 
             {/* Submission Action */}
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end pt-4 relative z-50">
               {!submittedQuiz ? (
                 <button
                   onClick={handleSubmitQuiz}
