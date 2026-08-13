@@ -24,6 +24,24 @@ export const INITIAL_FACULTY_ROSTER: FacultyRecord[] = [
     name: 'Prof. Anitha Rao',
     department: 'Information Science & Engineering',
     designation: 'Assistant Professor'
+  },
+  {
+    id: 'FAC_CSE_104',
+    name: 'Dr. Suresh Babu',
+    department: 'Computer Science & Engineering',
+    designation: 'Professor'
+  },
+  {
+    id: 'FAC_ISE_105',
+    name: 'Prof. Priya Sharma',
+    department: 'Information Science & Engineering',
+    designation: 'Associate Professor'
+  },
+  {
+    id: 'FAC_AI_106',
+    name: 'Dr. Ramesh V.',
+    department: 'Artificial Intelligence & Data Science',
+    designation: 'Professor & Chair'
   }
 ];
 

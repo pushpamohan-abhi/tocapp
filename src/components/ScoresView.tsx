@@ -27,21 +27,20 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
   const [studentsList, setStudentsList] = useState<StudentRecord[]>([]);
 
   // Faculty total students customizable map state
+  // Faculty total students customizable map state (defaulting to 65 per faculty, no hard-coded 390)
   const [facultyTotalStudents, setFacultyTotalStudents] = useState<Record<string, number>>(() => {
     try {
       const saved = localStorage.getItem('vtu_faculty_total_students');
-      return saved ? JSON.parse(saved) : {
-        'prof. dr. pushpa mohan': 390,
-        'dr. rajesh kumar': 240,
-        'prof. anitha rao': 180
-      };
-    } catch {
-      return {
-        'prof. dr. pushpa mohan': 390,
-        'dr. rajesh kumar': 240,
-        'prof. anitha rao': 180
-      };
-    }
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      'prof. dr. pushpa mohan': 65,
+      'dr. rajesh kumar': 65,
+      'prof. anitha rao': 65,
+      'dr. suresh babu': 65,
+      'prof. priya sharma': 65,
+      'dr. ramesh v.': 65
+    };
   });
 
   const updateFacultyTotal = (facName: string, count: number) => {
@@ -50,56 +49,8 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
     localStorage.setItem('vtu_faculty_total_students', JSON.stringify(updated));
   };
 
-  // Faculty students logged in customizable counter state
-  const [facultyLogins, setFacultyLogins] = useState<Record<string, number>>(() => {
-    try {
-      const saved = localStorage.getItem('vtu_faculty_logins');
-      return saved ? JSON.parse(saved) : {
-        'prof. dr. pushpa mohan': 127,
-        'dr. rajesh kumar': 89,
-        'prof. anitha rao': 65
-      };
-    } catch {
-      return {
-        'prof. dr. pushpa mohan': 127,
-        'dr. rajesh kumar': 89,
-        'prof. anitha rao': 65
-      };
-    }
-  });
-
-  const updateFacultyLogins = (facName: string, count: number) => {
-    const updated = { ...facultyLogins, [facName.toLowerCase()]: count };
-    setFacultyLogins(updated);
-    localStorage.setItem('vtu_faculty_logins', JSON.stringify(updated));
-  };
-
-  // Faculty quiz attempts customizable counter state
-  const [facultyQuizAttempts, setFacultyQuizAttempts] = useState<Record<string, number>>(() => {
-    try {
-      const saved = localStorage.getItem('vtu_faculty_quiz_attempts');
-      return saved ? JSON.parse(saved) : {
-        'prof. dr. pushpa mohan': 98,
-        'dr. rajesh kumar': 64,
-        'prof. anitha rao': 42
-      };
-    } catch {
-      return {
-        'prof. dr. pushpa mohan': 98,
-        'dr. rajesh kumar': 64,
-        'prof. anitha rao': 42
-      };
-    }
-  });
-
-  const updateFacultyQuizAttempts = (facName: string, count: number) => {
-    const updated = { ...facultyQuizAttempts, [facName.toLowerCase()]: count };
-    setFacultyQuizAttempts(updated);
-    localStorage.setItem('vtu_faculty_quiz_attempts', JSON.stringify(updated));
-  };
-
   // Tab view & detail modal states
-  const [activeTab, setActiveTab] = useState<'results' | 'summary' | 'faculty_overview'>('results');
+  const [activeTab, setActiveTab] = useState<'results' | 'summary' | 'faculty_overview'>('faculty_overview');
   const [selectedStudentForSummary, setSelectedStudentForSummary] = useState<string | null>(null);
   
   // Status & Async States
@@ -158,7 +109,6 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
       setIsLoading(false);
     }
 
-    // Fallback to localStorage if API call failed
     try {
       const stored = localStorage.getItem('vtu_quiz_scores');
       if (stored) {
@@ -178,7 +128,6 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
     fetchStudents().then(s => setStudentsList(s));
   }, []);
 
-  // CSV Export handler handling quotes cleanly
   const handleExportCSV = () => {
     const listToExport = filteredScores.length > 0 ? filteredScores : scores.filter(s => {
       if (currentUser.role === 'student') {
@@ -239,20 +188,20 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
     }
   };
 
-  // Filter options lists
   const uniqueClasses = Array.from(new Set(scores.map(s => s.className || 'CSE-A').filter(Boolean)));
   const uniqueAssessments = Array.from(new Set(scores.map(s => s.assessment || `Module ${s.moduleNumber} Quiz`).filter(Boolean)));
   const uniqueFaculties = Array.from(new Set(scores.map(s => s.faculty || 'Prof. Dr. Pushpa Mohan').filter(Boolean)));
   const uniqueDates = Array.from(new Set(scores.map(s => s.timestamp).filter(Boolean))).sort().reverse();
 
-  // Default faculty roster
   const defaultFacultyRoster: FacultyRecord[] = [
     { id: 'FAC_CSE_101', name: 'Prof. Dr. Pushpa Mohan', department: 'Computer Science & Engineering', designation: 'Professor & HOD' },
     { id: 'FAC_CSE_102', name: 'Dr. Rajesh Kumar', department: 'Computer Science & Engineering', designation: 'Associate Professor' },
     { id: 'FAC_ISE_103', name: 'Prof. Anitha Rao', department: 'Information Science & Engineering', designation: 'Assistant Professor' },
+    { id: 'FAC_CSE_104', name: 'Dr. Suresh Babu', department: 'Computer Science & Engineering', designation: 'Professor' },
+    { id: 'FAC_ISE_105', name: 'Prof. Priya Sharma', department: 'Information Science & Engineering', designation: 'Associate Professor' },
+    { id: 'FAC_AI_106', name: 'Dr. Ramesh V.', department: 'Artificial Intelligence & Data Science', designation: 'Professor & Chair' },
   ];
 
-  // Merge with custom registered faculty
   const allFacultyMap = new Map<string, FacultyRecord>();
   defaultFacultyRoster.forEach(f => allFacultyMap.set(f.name.toLowerCase(), f));
   facultyList.forEach(f => allFacultyMap.set(f.name.toLowerCase(), f));
@@ -270,69 +219,75 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
 
   const facultyRoster = Array.from(allFacultyMap.values());
 
-  // Per-Faculty Metrics Calculator
+  // Calculate unique logged in students from real login activity and scores
+  const getLoggedInStudentsCount = (facName: string) => {
+    const isAll = facName === 'all';
+    const facKey = facName.toLowerCase();
+    
+    let storedLogins: any[] = [];
+    try {
+      const raw = localStorage.getItem('vtu_student_logins');
+      if (raw) storedLogins = JSON.parse(raw);
+    } catch {}
+
+    const uniqueSet = new Set<string>();
+
+    storedLogins.forEach(l => {
+      const lFac = (l.faculty || '').toLowerCase();
+      if (isAll || lFac === facKey || lFac.includes(facKey) || facKey.includes(lFac)) {
+        if (l.userId) uniqueSet.add(l.userId.trim().toUpperCase());
+      }
+    });
+
+    const relevantScores = isAll
+      ? scores
+      : scores.filter(s => (s.faculty || 'Prof. Dr. Pushpa Mohan').trim().toLowerCase() === facKey);
+
+    relevantScores.forEach(s => {
+      if (s.userId) {
+        uniqueSet.add(s.userId.trim().toUpperCase());
+      }
+    });
+
+    return uniqueSet.size;
+  };
+
+  // Per-Faculty Metrics Calculator (REAL DATA ONLY, no hard-coded 390, 127, 98)
   const getFacultyStats = (facName: string) => {
     const isAll = facName === 'all';
     const facKey = facName.toLowerCase();
+    
     const facScores = isAll
       ? scores
       : scores.filter(s => (s.faculty || 'Prof. Dr. Pushpa Mohan').trim().toLowerCase() === facKey);
 
-    const attemptsCount = facScores.length;
     const scoresSubmitted = facScores.length;
-    const uniqueStudentsWhoAttempted = new Set(facScores.map(s => s.userId)).size;
+    const quizAttempts = facScores.length;
+    const studentsLoggedIn = getLoggedInStudentsCount(facName);
 
-    let totalStudents = facultyTotalStudents[facKey] !== undefined 
-      ? facultyTotalStudents[facKey] 
-      : (isAll ? 390 : (facName.toLowerCase().includes('pushpa') ? 390 : facName.toLowerCase().includes('rajesh') ? 240 : facName.toLowerCase().includes('anitha') ? 180 : 120));
-      
-    let studentsLoggedIn = facultyLogins[facKey] !== undefined
-      ? facultyLogins[facKey]
-      : (isAll ? 127 : (facName.toLowerCase().includes('pushpa') ? 127 : facName.toLowerCase().includes('rajesh') ? 89 : facName.toLowerCase().includes('anitha') ? 65 : 45));
-
-    let quizAttempts = facultyQuizAttempts[facKey] !== undefined
-      ? facultyQuizAttempts[facKey]
-      : (isAll ? 98 : (facName.toLowerCase().includes('pushpa') ? 98 : facName.toLowerCase().includes('rajesh') ? 64 : facName.toLowerCase().includes('anitha') ? 42 : 25));
-
-    if (!isAll) {
-      if (facName.toLowerCase().includes('pushpa mohan')) {
-        totalStudents = 390;
-        studentsLoggedIn = 127;
-        quizAttempts = Math.max(98, attemptsCount);
-      } else if (facName.toLowerCase().includes('rajesh kumar')) {
-        totalStudents = 240;
-        studentsLoggedIn = 89;
-        quizAttempts = Math.max(64, attemptsCount);
-      } else if (facName.toLowerCase().includes('anitha rao')) {
-        totalStudents = 180;
-        studentsLoggedIn = 65;
-        quizAttempts = Math.max(42, attemptsCount);
-      } else {
-        totalStudents = 120;
-        studentsLoggedIn = Math.max(45, uniqueStudentsWhoAttempted);
-        quizAttempts = attemptsCount;
-      }
+    let totalStudents = 0;
+    if (isAll) {
+      facultyRoster.forEach(f => {
+        const k = f.name.toLowerCase();
+        totalStudents += (facultyTotalStudents[k] !== undefined ? facultyTotalStudents[k] : 65);
+      });
     } else {
-      totalStudents = 390;
-      studentsLoggedIn = 127;
-      quizAttempts = Math.max(98, scores.length);
+      totalStudents = facultyTotalStudents[facKey] !== undefined ? facultyTotalStudents[facKey] : 65;
     }
-
-    const submittedCount = isAll ? Math.max(98, scores.length) : (quizAttempts === 98 ? 98 : scoresSubmitted);
 
     const avgScore = facScores.length > 0
       ? Math.round(facScores.reduce((acc, curr) => acc + curr.percentage, 0) / facScores.length)
-      : 78;
+      : 0;
 
     const passRate = facScores.length > 0
       ? Math.round((facScores.filter(s => s.percentage >= 40).length / facScores.length) * 100)
-      : 88;
+      : 0;
 
     return {
       totalStudents,
       studentsLoggedIn,
       quizAttempts,
-      scoresSubmitted: submittedCount,
+      scoresSubmitted,
       avgScore,
       passRate
     };
@@ -774,7 +729,7 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
                     )}
                   </div>
 
-                  {/* 4 Key Metrics Requested by User */}
+                  {/* 4 Key Metrics */}
                   <div className="grid grid-cols-2 gap-3 bg-[#F8F6F2] p-4 rounded-sm border border-[#1A1A1A]/10">
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
@@ -784,7 +739,7 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
                           value={stats.totalStudents}
                           onChange={(e) => updateFacultyTotal(fac.name, parseInt(e.target.value) || 0)}
                           className="w-16 text-right px-1.5 py-0.5 text-xs font-mono font-bold border border-[#1A1A1A]/20 bg-white rounded shadow-2xs focus:ring-1 focus:ring-[#991b1b]"
-                          title="Click to enter/update total students for this faculty"
+                          title="Editable roster count for this faculty"
                         />
                       </div>
                       <div className="text-[10px] font-mono text-[#1A1A1A]/40">Editable Roster Count</div>
@@ -792,32 +747,23 @@ export const ScoresView: React.FC<ScoresViewProps> = ({ currentUser }) => {
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-800">Students Logged In</span>
-                        <input
-                          type="number"
-                          value={stats.studentsLoggedIn}
-                          onChange={(e) => updateFacultyLogins(fac.name, parseInt(e.target.value) || 0)}
-                          className="w-16 text-right px-1.5 py-0.5 text-xs font-mono font-bold border border-emerald-300 bg-white rounded shadow-2xs focus:ring-1 focus:ring-emerald-600"
-                          title="Click to enter/update students logged in counter"
-                        />
+                        <span className="text-xl font-serif font-bold text-emerald-800 px-1">{stats.studentsLoggedIn}</span>
                       </div>
-                      <div className="text-[10px] font-mono text-emerald-700/60">Active Login Counter</div>
+                      <div className="text-[10px] font-mono text-emerald-700/60">Real Unique Logins</div>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1A1A1A]/60">Quiz Attempts</span>
-                        <input
-                          type="number"
-                          value={stats.quizAttempts}
-                          onChange={(e) => updateFacultyQuizAttempts(fac.name, parseInt(e.target.value) || 0)}
-                          className="w-16 text-right px-1.5 py-0.5 text-xs font-mono font-bold border border-[#1A1A1A]/20 bg-white rounded shadow-2xs focus:ring-1 focus:ring-[#991b1b]"
-                          title="Click to enter/update quiz attempts counter"
-                        />
+                        <span className="text-xl font-serif font-bold text-[#1A1A1A] px-1">{stats.quizAttempts}</span>
                       </div>
-                      <div className="text-[10px] font-mono text-[#1A1A1A]/40">Editable Attempt Counter</div>
+                      <div className="text-[10px] font-mono text-[#1A1A1A]/40">Real Submissions</div>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#991b1b] block">Scores Submitted</span>
-                      <span className="text-xl font-serif font-bold text-[#991b1b]">{stats.scoresSubmitted}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#991b1b]">Scores Submitted</span>
+                        <span className="text-xl font-serif font-bold text-[#991b1b] px-1">{stats.scoresSubmitted}</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-[#991b1b]/80">Database Validated</div>
                     </div>
                   </div>
 

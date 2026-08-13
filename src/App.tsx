@@ -47,9 +47,34 @@ export default function App() {
     return false; // Default: locked for students until Faculty enables
   });
 
+  const recordStudentLogin = (user: UserProfile) => {
+    if (user.role === 'student') {
+      try {
+        const logins = JSON.parse(localStorage.getItem('vtu_student_logins') || '[]');
+        const entry = {
+          userId: user.id,
+          name: user.name,
+          faculty: user.assignedFaculty || 'Prof. Dr. Pushpa Mohan',
+          timestamp: new Date().toISOString()
+        };
+        const existingIdx = logins.findIndex((l: any) => l.userId.toLowerCase() === user.id.toLowerCase());
+        if (existingIdx >= 0) {
+          logins[existingIdx].timestamp = new Date().toISOString();
+          logins[existingIdx].faculty = user.assignedFaculty || logins[existingIdx].faculty;
+        } else {
+          logins.push(entry);
+        }
+        localStorage.setItem('vtu_student_logins', JSON.stringify(logins));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    recordStudentLogin(user);
     if (user.role === 'student') {
       setActiveSection('module1');
     } else if (user.role === 'faculty') {
@@ -65,6 +90,7 @@ export default function App() {
 
   const handleSelectUser = (user: UserProfile) => {
     setCurrentUser(user);
+    recordStudentLogin(user);
     if (user.role === 'student') {
       setActiveSection('module1');
     } else if (user.role === 'faculty') {
