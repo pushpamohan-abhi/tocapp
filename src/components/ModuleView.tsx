@@ -189,15 +189,17 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
       q.options.forEach((opt, oIdx) => {
         const isUserChoice = Number(studentAnsIdx) === oIdx;
         const isCorrect = q.correctIndex === oIdx;
-        
         let statusText = '';
+        let marker = '[ ]';
+
         if (isUserChoice) {
+          marker = '[X]';
           statusText = isCorrect ? ' - [✓ YOUR ANSWER: CORRECT]' : ' - [✗ YOUR ANSWER: INCORRECT]';
         } else if (isCorrect) {
-          statusText = ' - [→ CORRECT ANSWER KEY]';
+          marker = '[✓]';
+          statusText = ' - [CORRECT ANSWER]';
         }
 
-        const marker = isUserChoice ? '[X]' : '[ ]';
         content += `  ${marker} ${opt}${statusText}\n`;
       });
       content += `\n`;
