@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { CURRICULUM_SECTIONS } from '../data/curriculumData';
 import { VTU_QUESTION_BANKS, MODULE_QUIZZES } from '../data/vtuData';
 import { UserProfile, QuizScoreRecord } from '../types';
-import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, GraduationCap, Play, Download, HelpCircle, Award, Lock, Unlock, ShieldAlert, FileSpreadsheet, Check, UserCheck } from 'lucide-react';
+import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, GraduationCap, Play, Download, HelpCircle, Award, Lock, Unlock, ShieldAlert, FileSpreadsheet, Check, UserCheck, FileText } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 interface ModuleViewProps {
   moduleNumber: 1 | 2 | 3 | 4 | 5;
@@ -131,6 +132,312 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const openQBankMarkdownAndPrintPdf = (withAnswers: boolean) => {
+    if (withAnswers && !canViewAnswers) {
+      alert("Faculty permission is required to view Question Bank with answers.");
+      return;
+    }
+    const questions = VTU_QUESTION_BANKS[moduleNumber] || [];
+    let content = `# VTU EXAMINATION QUESTION BANK - ${moduleTitle}\n${ullmanSubtitle}\n`;
+    content += `Mode: ${withAnswers ? 'With Detailed Answer Keys' : 'Questions Only (Without Answers)'}\n\n`;
+    
+    questions.forEach((q, idx) => {
+      content += `### Q${idx + 1}. [Marks: ${q.marks}]\n${q.question}\n\n`;
+      if (withAnswers) {
+        content += `**Detailed Answer / Solution Key:**\n${q.answerKey}\n\n`;
+      }
+      content += `----------------------------------------------------\n\n`;
+    });
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>VTU Q-Bank Module ${moduleNumber} (${withAnswers ? 'With Answers' : 'No Answers'}) - Print PDF</title>
+            <style>
+              body { font-family: 'Courier New', Courier, monospace; padding: 40px; background: #fff; color: #111; line-height: 1.6; white-space: pre-wrap; font-size: 13px; }
+              h1 { font-size: 20px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
+              h3 { font-size: 14px; margin-top: 15px; color: #333; font-weight: bold; }
+              @media print { body { padding: 15px; } }
+            </style>
+          </head>
+          <body>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+            <script>window.onload = function() { window.print(); };</script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+    }
+  };
+
+  const openQuizMarkdownAndPrintPdf = () => {
+    let content = `# VTU QUIZ ATTEMPT REPORT - ${moduleTitle}\n`;
+    content += `Student: ${currentUser.name} (${currentUser.role})\n`;
+    content += `Timestamp: ${existingAttemptRecord ? existingAttemptRecord.submittedAt : 'Not Attempted'}\n`;
+    content += `Score: ${existingAttemptRecord ? `${existingAttemptRecord.score} / ${moduleQuizzes.length}` : '0 / 0'}\n\n`;
+
+    moduleQuizzes.forEach((q, idx) => {
+      content += `### Q${idx + 1}: ${q.question}\n`;
+      q.options.forEach((opt, oIdx) => {
+        const isUserChoice = existingAttemptRecord?.answers[q.id] === oIdx;
+        const isCorrect = q.correctIndex === oIdx;
+        content += `  ${isUserChoice ? '[X]' : '[ ]'} ${opt} ${isCorrect ? '(Correct)' : ''}\n`;
+      });
+      content += `\n`;
+    });
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Quiz Report - ${moduleTitle} - Print PDF</title>
+            <style>
+              body { font-family: 'Courier New', Courier, monospace; padding: 40px; background: #fff; color: #111; line-height: 1.6; white-space: pre-wrap; font-size: 13px; }
+              h1 { font-size: 20px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
+              h3 { font-size: 14px; margin-top: 15px; color: #333; font-weight: bold; }
+              @media print { body { padding: 15px; } }
+            </style>
+          </head>
+          <body>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+            <script>window.onload = function() { window.print(); };</script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+    }
+  };
+
+  const openMarkdownAndPrintPdf = () => {
+    let content = `# ${moduleTitle}\n${ullmanSubtitle}\n\n`;
+    moduleSections.forEach(sec => {
+      content += `## Section ${sec.number}: ${sec.title}\n`;
+      content += `Ullman Chapter: ${sec.ullmanChapter}\n\n`;
+      content += `### Summary\n${sec.summary}\n\n`;
+      content += `### Lecturer Teaching Methods\n`;
+      sec.lecturerMethods.forEach(m => content += `- ${m}\n`);
+      content += `\n### Fundamental Concepts & Analogies\n`;
+      sec.keyConcepts.forEach(c => {
+        content += `- **${c.term}**: ${c.definition} (Analogy: ${c.analogy})\n`;
+      });
+      content += `\n### Manifold Representations\n`;
+      content += `- Algebraic: ${sec.manifold.algebraic}\n`;
+      content += `- Set-Builder: ${sec.manifold.setBuilder}\n`;
+      content += `- Formal Tuple: ${sec.manifold.formalTuple}\n`;
+      content += `- Description: ${sec.manifold.description}\n\n`;
+      content += `### Real-World Engineering Applications\n`;
+      sec.realWorldApps.forEach(app => content += `- ${app}\n`);
+      
+      if (sec.padmaReddyExamples && sec.padmaReddyExamples.length > 0) {
+        content += `\n### Dr. A.M. Padma Reddy Textbook — Step-by-Step Solved Numerical Examples\n`;
+        sec.padmaReddyExamples.forEach((ex, idx) => {
+          content += `\n#### Example ${idx + 1}: ${ex.title}\n`;
+          content += `**Problem Statement:**\n${ex.problem}\n\n`;
+          content += `**Step-by-Step Numerical Walkthrough:**\n`;
+          ex.stepByStepSolution.forEach(step => {
+            content += `- ${step}\n`;
+          });
+          content += `\n**Final Solution / Result:** ${ex.finalAnswer}\n`;
+        });
+      }
+
+      content += `\n\n`;
+    });
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${moduleTitle} - Study Notes (.md View & Print)</title>
+            <style>
+              body { font-family: 'Courier New', Courier, monospace; padding: 40px; background: #fff; color: #111; line-height: 1.6; white-space: pre-wrap; font-size: 13px; }
+              h1 { font-size: 20px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
+              h2 { font-size: 16px; margin-top: 30px; color: #111; border-bottom: 1px dashed #ccc; padding-bottom: 4px; }
+              h3 { font-size: 14px; margin-top: 15px; color: #333; font-weight: bold; }
+              h4 { font-size: 13px; margin-top: 10px; color: #666; }
+              @media print {
+                body { padding: 15px; }
+              }
+            </style>
+          </head>
+          <body>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+            <script>
+              window.onload = function() {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+    }
+  };
+
+  const downloadPdfStudyNotes = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(153, 27, 27); // #991b1b
+      doc.text(`VTU Study Notes - ${moduleTitle}`, pageWidth / 2, y, { align: "center" });
+      
+      y += 8;
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      doc.text(ullmanSubtitle, pageWidth / 2, y, { align: "center", maxWidth: pageWidth - 30 });
+
+      y += 15;
+
+      moduleSections.forEach((sec, sIdx) => {
+        if (y > 240) { doc.addPage(); y = 15; }
+        
+        // Section Header
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(153, 27, 27);
+        doc.text(`Section ${sec.number}: ${sec.title}`, 15, y);
+        y += 5;
+
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Ullman Chapter: ${sec.ullmanChapter}`, 15, y);
+        y += 6;
+
+        // Summary
+        if (y > 250) { doc.addPage(); y = 15; }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(30, 30, 30);
+        doc.text("Summary:", 15, y);
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        const summaryLines = doc.splitTextToSize(sec.summary, pageWidth - 30);
+        doc.text(summaryLines, 15, y);
+        y += summaryLines.length * 4 + 6;
+
+        // Lecturer Methods
+        if (sec.lecturerMethods && sec.lecturerMethods.length > 0) {
+          if (y > 250) { doc.addPage(); y = 15; }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.text("Lecturer Teaching Methods:", 15, y);
+          y += 5;
+          doc.setFont("helvetica", "normal");
+          sec.lecturerMethods.forEach(m => {
+            if (y > 270) { doc.addPage(); y = 15; }
+            const mLines = doc.splitTextToSize(`• ${m}`, pageWidth - 35);
+            doc.text(mLines, 18, y);
+            y += mLines.length * 4 + 3;
+          });
+          y += 3;
+        }
+
+        // Key Concepts & Analogies
+        if (sec.keyConcepts && sec.keyConcepts.length > 0) {
+          if (y > 250) { doc.addPage(); y = 15; }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.text("Key Concepts & Analogies:", 15, y);
+          y += 5;
+          doc.setFont("helvetica", "normal");
+          sec.keyConcepts.forEach(c => {
+            if (y > 270) { doc.addPage(); y = 15; }
+            const cLines = doc.splitTextToSize(`• ${c.term}: ${c.definition} (Analogy: ${c.analogy})`, pageWidth - 35);
+            doc.text(cLines, 18, y);
+            y += cLines.length * 4 + 3;
+          });
+          y += 3;
+        }
+
+        // Manifold Representations
+        if (sec.manifold) {
+          if (y > 250) { doc.addPage(); y = 15; }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.text("Manifold Representations:", 15, y);
+          y += 5;
+          doc.setFont("helvetica", "normal");
+          const manLines = doc.splitTextToSize(`• Algebraic: ${sec.manifold.algebraic}\n• Set-Builder: ${sec.manifold.setBuilder}\n• Formal Tuple: ${sec.manifold.formalTuple}\n• Description: ${sec.manifold.description}`, pageWidth - 35);
+          doc.text(manLines, 18, y);
+          y += manLines.length * 4 + 5;
+        }
+
+        // Real-World Applications
+        if (sec.realWorldApps && sec.realWorldApps.length > 0) {
+          if (y > 250) { doc.addPage(); y = 15; }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.text("Real-World Engineering Applications:", 15, y);
+          y += 5;
+          doc.setFont("helvetica", "normal");
+          sec.realWorldApps.forEach(app => {
+            if (y > 270) { doc.addPage(); y = 15; }
+            const aLines = doc.splitTextToSize(`• ${app}`, pageWidth - 35);
+            doc.text(aLines, 18, y);
+            y += aLines.length * 4 + 3;
+          });
+          y += 3;
+        }
+
+        // Padma Reddy Numerical Examples
+        if (sec.padmaReddyExamples && sec.padmaReddyExamples.length > 0) {
+          if (y > 240) { doc.addPage(); y = 15; }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.setTextColor(153, 27, 27);
+          doc.text("Dr. A.M. Padma Reddy Textbook — Solved Numerical Examples:", 15, y);
+          y += 5;
+          doc.setTextColor(30, 30, 30);
+
+          sec.padmaReddyExamples.forEach((ex, exIdx) => {
+            if (y > 250) { doc.addPage(); y = 15; }
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.text(`Example ${exIdx + 1}: ${ex.title}`, 18, y);
+            y += 4;
+            doc.setFont("helvetica", "normal");
+            const probLines = doc.splitTextToSize(`Problem: ${ex.problem}`, pageWidth - 40);
+            doc.text(probLines, 18, y);
+            y += probLines.length * 4 + 3;
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Step-by-Step Walkthrough:", 18, y);
+            y += 4;
+            doc.setFont("helvetica", "normal");
+            ex.stepByStepSolution.forEach(step => {
+              if (y > 270) { doc.addPage(); y = 15; }
+              const sLines = doc.splitTextToSize(`- ${step}`, pageWidth - 45);
+              doc.text(sLines, 21, y);
+              y += sLines.length * 4 + 2;
+            });
+
+            if (y > 265) { doc.addPage(); y = 15; }
+            doc.setFont("helvetica", "bold");
+            doc.text(`Final Answer: ${ex.finalAnswer}`, 18, y);
+            y += 6;
+          });
+        }
+
+        y += 8;
+      });
+
+      doc.save(`Automata_Module_${moduleNumber}_Comprehensive_Study_Notes.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert("Error generating PDF. Please try again.");
+    }
   };
 
   const canViewAnswers = currentUser.role === 'faculty' || qbAnswersAllowed;
@@ -280,49 +587,62 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
       )}
 
       {/* Hero Banner */}
-      <div className="bg-white text-[#0F172A] rounded-xl p-8 shadow-md border-2 border-slate-200 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="relative z-10 max-w-3xl space-y-3">
-          <div className="inline-flex items-center space-x-2 bg-[#991b1b] text-white px-3 py-1.5 rounded-md text-xs font-extrabold uppercase tracking-widest font-mono shadow-xs">
-            <GraduationCap className="w-4 h-4 text-amber-300" />
-            <span>{moduleTitle}</span>
+      <div className="bg-white text-[#0F172A] rounded-xl p-6 md:p-8 shadow-md border-2 border-slate-200 relative flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="relative z-10 max-w-3xl space-y-2">
+            <div className="inline-flex items-center space-x-2 bg-[#991b1b] text-white px-3 py-1.5 rounded-md text-xs font-extrabold uppercase tracking-widest font-mono shadow-xs">
+              <GraduationCap className="w-4 h-4 text-amber-300" />
+              <span>{moduleTitle}</span>
+            </div>
+            <h2 className="font-serif italic text-2xl md:text-4xl text-[#0F172A] font-extrabold">
+              Automata Theory & Computation Masterclass
+            </h2>
+            <p className="text-[#dc2626] font-extrabold text-xs md:text-sm uppercase tracking-wider font-mono">
+              {ullmanSubtitle}
+            </p>
           </div>
-          <h2 className="font-serif italic text-3xl md:text-5xl text-[#0F172A] font-extrabold">
-            Automata Theory & Computation Masterclass
-          </h2>
-          <p className="text-[#dc2626] font-extrabold text-sm md:text-base uppercase tracking-wider font-mono">
-            {ullmanSubtitle}
-          </p>
         </div>
-        <div className="flex flex-wrap gap-2.5 shrink-0">
+
+        <div className="flex flex-wrap gap-2.5 pt-2 border-t border-slate-100">
           <button
-            onClick={downloadStudyNotes}
-            className="bg-[#0F172A] hover:bg-black text-white px-4 py-3 rounded-lg text-xs md:text-sm font-extrabold uppercase tracking-widest transition-all flex items-center space-x-2 shadow-sm"
+            onClick={openMarkdownAndPrintPdf}
+            className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
+            title="Open Study Notes as .md and Print / Save PDF"
           >
-            <Download className="w-4 h-4" />
-            <span>Study Notes</span>
+            <FileText className="w-4 h-4 text-amber-300" />
+            <span>Study Notes (.md & PDF)</span>
           </button>
-          <div className="flex gap-1">
-            <button
-              onClick={() => downloadVtuQuestionBank(false)}
-              className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-3 rounded-l-lg text-xs md:text-sm font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
-              title="Download Questions Without Answers"
-            >
-              <Download className="w-4 h-4" />
-              <span>Q-Bank (No Ans)</span>
-            </button>
-            <button
-              onClick={() => downloadVtuQuestionBank(true)}
-              className={`px-3.5 py-3 rounded-r-lg text-xs md:text-sm font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm ${
-                canViewAnswers
-                  ? 'bg-[#991b1b] hover:bg-[#7f1d1d] text-white'
-                  : 'bg-slate-300 text-slate-700 cursor-not-allowed'
-              }`}
-              title={canViewAnswers ? "Download Questions With Answers" : "Faculty permission required"}
-            >
-              {!canViewAnswers ? <Lock className="w-4 h-4 text-amber-600" /> : <Download className="w-4 h-4" />}
-              <span>Q-Bank (With Ans)</span>
-            </button>
-          </div>
+          
+          <button
+            onClick={() => openQBankMarkdownAndPrintPdf(false)}
+            className="bg-[#334155] hover:bg-[#1e293b] text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
+            title="Q-Bank Without Answers (.md & Print PDF)"
+          >
+            <FileText className="w-4 h-4 text-amber-300" />
+            <span>Q-Bank No Ans (.md & PDF)</span>
+          </button>
+
+          <button
+            onClick={() => openQBankMarkdownAndPrintPdf(true)}
+            className={`px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm ${
+              canViewAnswers
+                ? 'bg-[#991b1b] hover:bg-[#7f1d1d] text-white'
+                : 'bg-slate-300 text-slate-700 cursor-not-allowed'
+            }`}
+            title={canViewAnswers ? "Q-Bank With Answers (.md & Print PDF)" : "Faculty permission required"}
+          >
+            {!canViewAnswers ? <Lock className="w-4 h-4 text-amber-600" /> : <FileText className="w-4 h-4 text-amber-300" />}
+            <span>Q-Bank With Ans (.md & PDF)</span>
+          </button>
+
+          <button
+            onClick={openQuizMarkdownAndPrintPdf}
+            className="bg-[#1e293b] hover:bg-black text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
+            title="Open Quiz Report as .md and Print / Save PDF"
+          >
+            <Award className="w-4 h-4 text-amber-300" />
+            <span>Quiz Report (.md & PDF)</span>
+          </button>
         </div>
       </div>
 

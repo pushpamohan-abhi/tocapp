@@ -13,10 +13,10 @@ interface AuthModalProps {
 }
 
 export const DEFAULT_STUDENT: UserProfile = {
-  id: '1VT22CS001',
-  name: 'Rahul Sharma',
+  id: '1VT22CS006',
+  name: 'SHARMA',
   role: 'student',
-  sem: 'CSE-A',
+  sem: '5th Semester CSE',
   department: 'Computer Science & Engineering',
   assignedFaculty: 'Prof. Dr. Pushpa Mohan'
 };

@@ -18,8 +18,12 @@ export const getStoredStudents = (): StudentRecord[] => {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter(s =>
+          s && s.id &&
+          !['1VT22CS001', '1VT22CS002', '1VT22CS003'].includes(s.id.toUpperCase()) &&
+          !['RAHUL SHARMA', 'PRIYA ANANTH', 'KARTHIK V'].includes((s.name || '').toUpperCase())
+        );
       }
     }
   } catch (e) {
@@ -30,7 +34,12 @@ export const getStoredStudents = (): StudentRecord[] => {
 
 export const saveStoredStudentsLocally = (students: StudentRecord[]) => {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(students));
+    const cleanList = students.filter(s =>
+      s && s.id &&
+      !['1VT22CS001', '1VT22CS002', '1VT22CS003'].includes(s.id.toUpperCase()) &&
+      !['RAHUL SHARMA', 'PRIYA ANANTH', 'KARTHIK V'].includes((s.name || '').toUpperCase())
+    );
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanList));
   } catch (e) {
     console.error("Error saving students to localStorage:", e);
   }
@@ -48,20 +57,16 @@ export const fetchStudents = async (): Promise<StudentRecord[]> => {
         serverStudents = data.students;
       }
 
-      if (serverStudents.length > 0) {
-        // Merge local and server records by uppercase ID
-        const local = getStoredStudents();
-        const mergedMap = new Map<string, StudentRecord>();
+      // Filter out any old test student records
+      const cleanStudents = serverStudents.filter(s =>
+        s && s.id &&
+        !['1VT22CS001', '1VT22CS002', '1VT22CS003'].includes(s.id.toUpperCase()) &&
+        !['RAHUL SHARMA', 'PRIYA ANANTH', 'KARTHIK V'].includes((s.name || '').toUpperCase())
+      );
 
-        // Local first
-        local.forEach(s => mergedMap.set(s.id.toUpperCase(), s));
-        // Server second (overrides or adds)
-        serverStudents.forEach(s => mergedMap.set(s.id.toUpperCase(), s));
-
-        const mergedList = Array.from(mergedMap.values());
-        saveStoredStudentsLocally(mergedList);
-        return mergedList;
-      }
+      // Overwrite local storage directly with clean server roster
+      saveStoredStudentsLocally(cleanStudents);
+      return cleanStudents;
     }
   } catch (e) {
     console.warn("API /api/students fetch failed, using local storage roster:", e);
@@ -152,9 +157,22 @@ export const deleteStudentFromRoster = async (usn: string): Promise<StudentRecor
   window.dispatchEvent(new CustomEvent('vtu-students-updated', { detail: updatedList }));
 
   try {
-    await fetch(`/api/students?id=${encodeURIComponent(cleanUsn)}`, {
+    const res = await fetch(`/api/students?id=${encodeURIComponent(cleanUsn)}`, {
       method: 'DELETE'
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.students)) {
+        const cleanServer = data.students.filter((s: StudentRecord) =>
+          s && s.id &&
+          !['1VT22CS001', '1VT22CS002', '1VT22CS003'].includes(s.id.toUpperCase()) &&
+          !['RAHUL SHARMA', 'PRIYA ANANTH', 'KARTHIK V'].includes((s.name || '').toUpperCase())
+        );
+        saveStoredStudentsLocally(cleanServer);
+        window.dispatchEvent(new CustomEvent('vtu-students-updated', { detail: cleanServer }));
+        return cleanServer;
+      }
+    }
   } catch (e) {
     console.warn("DELETE /api/students background call notice:", e);
   }

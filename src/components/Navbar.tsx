@@ -27,8 +27,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const downloadAllModules = (withAnswers: boolean) => {
     if (withAnswers && currentUser.role === 'student' && !qbAnswersAllowed) {
-      alert("Faculty permission is required to download Question Bank with answers. Downloading Questions Only version.");
-      withAnswers = false;
+      alert("Faculty permission is required to view Question Bank with answers.");
+      return;
     }
 
     let content = `# VTU EXAMINATION COMPLETE QUESTION BANK (BCS503 & 10CS56)\n`;
@@ -48,15 +48,28 @@ export const Navbar: React.FC<NavbarProps> = ({
       });
     }
 
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `VTU_BCS503_10CS56_All_Modules_${withAnswers ? 'With_Answers' : 'Without_Answers'}.md`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>VTU All Modules Q-Bank (${withAnswers ? 'With Answers' : 'No Answers'}) - Print PDF</title>
+            <style>
+              body { font-family: 'Courier New', Courier, monospace; padding: 40px; background: #fff; color: #111; line-height: 1.6; white-space: pre-wrap; font-size: 13px; }
+              h1 { font-size: 20px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
+              h2 { font-size: 16px; margin-top: 30px; color: #111; border-bottom: 1px dashed #ccc; padding-bottom: 4px; }
+              h3 { font-size: 14px; margin-top: 15px; color: #333; font-weight: bold; }
+              @media print { body { padding: 15px; } }
+            </style>
+          </head>
+          <body>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+            <script>window.onload = function() { window.print(); };</script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+    }
   };
 
   const navItems: { id: SectionId; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -188,10 +201,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={() => downloadAllModules(false)}
                 className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-2 rounded-md text-xs md:text-sm font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-sm"
-                title="Download All Modules Question Bank (Questions Only - No Answers)"
+                title="All Modules Q-Bank No Answers (.md & Print PDF)"
               >
-                <Download className="w-4 h-4" />
-                <span>Q-Bank (No Ans)</span>
+                <FileText className="w-4 h-4 text-amber-300" />
+                <span>All Modules Q-Bank No Ans (.md & PDF)</span>
               </button>
 
               {/* Question Bank Download - With Answers (Faculty Always / Student if Unlocked) */}
@@ -199,19 +212,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   onClick={() => downloadAllModules(true)}
                   className="bg-[#991b1b] hover:bg-[#7f1d1d] text-white px-3.5 py-2 rounded-md text-xs md:text-sm font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-sm"
-                  title="Download All Modules Question Bank With Detailed Solution Keys"
+                  title="All Modules Q-Bank With Answers (.md & Print PDF)"
                 >
-                  <Download className="w-4 h-4" />
-                  <span>Q-Bank (With Ans)</span>
+                  <FileText className="w-4 h-4 text-amber-300" />
+                  <span>All Modules Q-Bank With Ans (.md & PDF)</span>
                 </button>
               ) : (
                 <button
                   onClick={() => downloadAllModules(true)}
                   className="bg-slate-200 text-slate-800 hover:bg-slate-300 border-2 border-slate-300 px-3.5 py-2 rounded-md text-xs md:text-sm font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-2xs"
-                  title="Answer key locked for Students. Switch to Faculty Mode to download with answers."
+                  title="Answer key locked for Students. Switch to Faculty Mode to view with answers."
                 >
                   <Lock className="w-4 h-4 text-amber-600" />
-                  <span>Q-Bank (With Ans - Faculty Only)</span>
+                  <span>All Modules Q-Bank With Ans (Locked)</span>
                 </button>
               )}
             </div>

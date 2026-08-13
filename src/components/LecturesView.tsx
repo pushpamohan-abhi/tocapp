@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CURRICULUM_SECTIONS } from '../data/curriculumData';
-import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, ChevronRight, GraduationCap } from 'lucide-react';
+import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, ChevronRight, GraduationCap, Download, FileText, Printer } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 interface LecturesViewProps {
   onNavigateToSimulator: (sectionId: string) => void;
@@ -8,23 +9,173 @@ interface LecturesViewProps {
 
 export const LecturesView: React.FC<LecturesViewProps> = ({ onNavigateToSimulator }) => {
   const [selectedId, setSelectedId] = useState<string>('3.1');
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const activeSection = CURRICULUM_SECTIONS.find(s => s.id === selectedId) || CURRICULUM_SECTIONS[0];
+
+  const handleDownloadPDF = () => {
+    setIsExportingPDF(true);
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(153, 27, 27); // #991b1b
+      doc.text("VTU Automata Theory & Computability Study Notes", pageWidth / 2, y, { align: "center" });
+      
+      y += 10;
+      doc.setFontSize(12);
+      doc.setTextColor(30, 30, 30);
+      doc.text(`Section ${activeSection.number}: ${activeSection.title}`, pageWidth / 2, y, { align: "center" });
+
+      y += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Reference: ${activeSection.ullmanChapter}`, pageWidth / 2, y, { align: "center" });
+
+      y += 12;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(20, 20, 20);
+      doc.text("Core Summary:", 15, y);
+      
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const summaryLines = doc.splitTextToSize(activeSection.summary, pageWidth - 30);
+      doc.text(summaryLines, 15, y);
+      y += summaryLines.length * 5 + 6;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Pedagogical Teaching Methods:", 15, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      activeSection.lecturerMethods.forEach((m) => {
+        const lines = doc.splitTextToSize(`• ${m}`, pageWidth - 35);
+        doc.text(lines, 18, y);
+        y += lines.length * 5 + 3;
+      });
+
+      y += 4;
+      doc.setFont("helvetica", "bold");
+      doc.text("Key Concepts & Definitions:", 15, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      activeSection.keyConcepts.forEach((c) => {
+        if (y > 270) { doc.addPage(); y = 15; }
+        const lines = doc.splitTextToSize(`• ${c.term}: ${c.definition} (Analogy: ${c.analogy})`, pageWidth - 35);
+        doc.text(lines, 18, y);
+        y += lines.length * 5 + 4;
+      });
+
+      y += 4;
+      doc.setFont("helvetica", "bold");
+      doc.text("Real-World Engineering Applications:", 15, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      activeSection.realWorldApps.forEach((a) => {
+        if (y > 270) { doc.addPage(); y = 15; }
+        const lines = doc.splitTextToSize(`• ${a}`, pageWidth - 35);
+        doc.text(lines, 18, y);
+        y += lines.length * 5 + 3;
+      });
+
+      doc.save(`VTU_Automata_Notes_Sec_${activeSection.number.replace(/\./g, '_')}.pdf`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
       {/* Hero Intro Banner */}
       <div className="bg-[#F8F6F2] text-[#1A1A1A] rounded-sm p-8 shadow-sm border border-[#1A1A1A]/10 relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl space-y-3">
-          <div className="inline-flex items-center space-x-2 bg-[#991b1b] text-white px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-widest font-mono">
-            <GraduationCap className="w-3.5 h-3.5" />
-            <span>Lectures & Manifolds (Module 2)</span>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex items-center space-x-2 bg-[#991b1b] text-white px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-widest font-mono">
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>Lectures & Study Notes (PDF Format)</span>
+            </div>
+            <h2 className="font-serif italic text-3xl md:text-4xl text-[#1A1A1A]">
+              Automata Theory & Computation Masterclass
+            </h2>
+            <p className="text-[#1A1A1A]/80 text-sm leading-relaxed">
+              Explore core foundational sections (3.1, 3.2, 3.3, 4.1, 4.2, 4.4) through pedagogical lecturer methods, manifold representations, real-world engineering case studies, and live interactive simulations.
+            </p>
           </div>
-          <h2 className="font-serif italic text-3xl md:text-4xl text-[#1A1A1A]">
-            Automata Theory & Computation Masterclass
-          </h2>
-          <p className="text-[#1A1A1A]/80 text-sm leading-relaxed">
-            Explore core foundational sections (3.1, 3.2, 3.3, 4.1, 4.2, 4.4) through pedagogical lecturer methods, manifold representations, real-world engineering case studies, and live interactive simulations.
-          </p>
+
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <button
+              onClick={handleDownloadPDF}
+              className="inline-flex items-center justify-center space-x-2 bg-[#991b1b] hover:bg-[#7f1d1d] text-white px-5 py-3 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-xs cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF Notes</span>
+            </button>
+            <button
+              onClick={() => {
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                  printWindow.document.write(`
+                    <html>
+                      <head>
+                        <title>VTU CSE - Automata Study Notes (${activeSection.number} ${activeSection.title})</title>
+                        <style>
+                          body { font-family: Georgia, serif; padding: 40px; color: #1a1a1a; line-height: 1.6; }
+                          h1 { font-size: 24px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
+                          h2 { font-size: 18px; margin-top: 20px; color: #333; }
+                          .badge { background: #f3f4f6; padding: 4px 8px; font-family: monospace; font-size: 11px; font-weight: bold; }
+                          .box { background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; margin: 10px 0; border-radius: 4px; }
+                          ul { margin: 5px 0; padding-left: 20px; }
+                          li { margin-bottom: 6px; }
+                        </style>
+                      </head>
+                      <body>
+                        <h1>VTU Automata Theory &amp; Computability Study Notes</h1>
+                        <p><strong>Section ${activeSection.number}:</strong> ${activeSection.title} (${activeSection.ullmanChapter})</p>
+                        <div class="box">
+                          <h2>Core Summary</h2>
+                          <p>${activeSection.summary}</p>
+                        </div>
+                        <div class="box">
+                          <h2>Pedagogical Teaching Methods</h2>
+                          <ul>
+                            ${activeSection.lecturerMethods.map(m => `<li>${m}</li>`).join('')}
+                          </ul>
+                        </div>
+                        <div class="box">
+                          <h2>Key Concepts &amp; Analogies</h2>
+                          ${activeSection.keyConcepts.map(c => `<p><strong>${c.term}:</strong> ${c.definition} <br/><em>Analogy:</em> ${c.analogy}</p>`).join('<hr style="border:0; border-top:1px solid #eee; margin:10px 0;"/>')}
+                        </div>
+                        <div class="box">
+                          <h2>Manifold Representations</h2>
+                          <p><strong>Algebraic:</strong> <code>${activeSection.manifold.algebraic}</code></p>
+                          <p><strong>Set-Builder:</strong> <code>${activeSection.manifold.setBuilder}</code></p>
+                          <p><strong>Tuple:</strong> ${activeSection.manifold.formalTuple}</p>
+                          <p><strong>Semantics:</strong> ${activeSection.manifold.description}</p>
+                        </div>
+                        <div class="box">
+                          <h2>Real-World Engineering Applications</h2>
+                          <ul>
+                            ${activeSection.realWorldApps.map(a => `<li>${a}</li>`).join('')}
+                          </ul>
+                        </div>
+                        <script>window.print();</script>
+                      </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                }
+              }}
+              className="inline-flex items-center justify-center space-x-2 bg-[#1A1A1A] hover:bg-black text-white px-5 py-3 rounded-sm text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-xs cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print / Save PDF</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -175,3 +326,4 @@ export const LecturesView: React.FC<LecturesViewProps> = ({ onNavigateToSimulato
     </div>
   );
 };
+

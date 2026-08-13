@@ -540,13 +540,17 @@ app.delete("/api/scores", async (req, res) => {
 // Student Roster API Routes
 app.get("/api/students", (req, res) => {
   try {
-    // Extract any student unique IDs from scoresStore to ensure all students who have taken quizzes are also in studentsStore
+    const testIds = ['1VT22CS001', '1VT22CS002', '1VT22CS003'];
+    // Filter out test students from studentsStore
+    studentsStore = studentsStore.filter(s => s && s.id && !testIds.includes(s.id.toUpperCase()));
+    scoresStore = scoresStore.filter(s => s && s.userId && !testIds.includes(s.userId.toUpperCase()));
+
     const studentMap = new Map<string, any>();
     studentsStore.forEach(s => studentMap.set(s.id.toUpperCase(), s));
 
     scoresStore.forEach(s => {
       const usn = (s.userId || '').trim().toUpperCase();
-      if (usn && !studentMap.has(usn)) {
+      if (usn && !testIds.includes(usn) && !studentMap.has(usn)) {
         studentMap.set(usn, {
           id: usn,
           name: s.userName || 'Student',
