@@ -174,18 +174,31 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
     }
   };
 
-  const openQuizMarkdownAndPrintPdf = () => {
-    let content = `# VTU QUIZ ATTEMPT REPORT - ${moduleTitle}\n`;
-    content += `Student: ${currentUser.name} (${currentUser.role})\n`;
-    content += `Timestamp: ${existingAttemptRecord ? existingAttemptRecord.submittedAt : 'Not Attempted'}\n`;
-    content += `Score: ${existingAttemptRecord ? `${existingAttemptRecord.score} / ${moduleQuizzes.length}` : '0 / 0'}\n\n`;
+  const openQuizMarkdownAndPrintPdf = (overrideRecord?: QuizScoreRecord | null) => {
+    const activeRec = overrideRecord !== undefined ? overrideRecord : existingAttemptRecord;
+    let content = `# VTU QUIZ ATTEMPT & QUESTION REPORT - ${moduleTitle}\n`;
+    content += `Student/Faculty: ${currentUser.name} (${currentUser.role})\n`;
+    content += `ID / USN: ${currentUser.id}\n`;
+    content += `Timestamp: ${activeRec ? activeRec.timestamp : 'Not Attempted'}\n`;
+    content += `Score: ${activeRec ? `${activeRec.score} / ${moduleQuizzes.length} (${activeRec.percentage}%)` : '0 / 0 (0%)'}\n\n`;
+    content += `==================================================\n\n`;
 
     moduleQuizzes.forEach((q, idx) => {
       content += `### Q${idx + 1}: ${q.question}\n`;
+      const studentAnsIdx = activeRec?.userAnswers ? activeRec.userAnswers[q.id] : undefined;
       q.options.forEach((opt, oIdx) => {
-        const isUserChoice = existingAttemptRecord?.answers[q.id] === oIdx;
+        const isUserChoice = Number(studentAnsIdx) === oIdx;
         const isCorrect = q.correctIndex === oIdx;
-        content += `  ${isUserChoice ? '[X]' : '[ ]'} ${opt} ${isCorrect ? '(Correct)' : ''}\n`;
+        
+        let statusText = '';
+        if (isUserChoice) {
+          statusText = isCorrect ? ' - [✓ YOUR ANSWER: CORRECT]' : ' - [✗ YOUR ANSWER: INCORRECT]';
+        } else if (isCorrect) {
+          statusText = ' - [→ CORRECT ANSWER KEY]';
+        }
+
+        const marker = isUserChoice ? '[X]' : '[ ]';
+        content += `  ${marker} ${opt}${statusText}\n`;
       });
       content += `\n`;
     });
@@ -507,8 +520,16 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
       userAnswers: selectedAnswers
     };
 
-    // Save into localStorage and POST to Vercel/server score API
+    // Save into localStorage and POST to Vercel/server score API (Only for students)
     try {
+      setExistingAttemptRecord(record);
+      setSubmittedQuiz(true);
+
+      if (currentUser.role === 'faculty') {
+        // Faculty quiz scores are not saved to student scores CSV/database
+        return;
+      }
+
       const stored = localStorage.getItem('vtu_quiz_scores');
       const existingScores: QuizScoreRecord[] = stored ? JSON.parse(stored) : [];
       const targetUserId = (record.userId || '').trim().toLowerCase();
@@ -523,8 +544,6 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
         existingScores.push(record);
       }
       localStorage.setItem('vtu_quiz_scores', JSON.stringify(existingScores));
-      setExistingAttemptRecord(record);
-      setSubmittedQuiz(true);
 
       // Persist to server API (/api/scores)
       fetch('/api/scores', {
