@@ -197,25 +197,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
 
             <div className="flex gap-2 items-center">
-              {/* Question Bank Download - Questions Only (No Answers) */}
+              {/* All Modules Question Bank Download - Questions Only (No Answers) */}
               <button
                 onClick={() => downloadAllModules(false)}
                 className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-2 rounded-md text-xs md:text-sm font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-sm"
-                title="All Modules Q-Bank No Answers (.md & Print PDF)"
+                title="All Modules Q-Bank No Answers"
               >
                 <FileText className="w-4 h-4 text-amber-300" />
-                <span>All Modules Q-Bank No Ans (.md & PDF)</span>
+                <span>All Modules Q-Bank No Ans</span>
               </button>
 
-              {/* Question Bank Download - With Answers (Faculty Always / Student if Unlocked) */}
+              {/* All Modules Question Bank Download - With Answers (Faculty Always / Student if Unlocked) */}
               {currentUser.role === 'faculty' || qbAnswersAllowed ? (
                 <button
                   onClick={() => downloadAllModules(true)}
-                  className="bg-[#991b1b] hover:bg-[#7f1d1d] text-white px-3.5 py-2 rounded-md text-xs md:text-sm font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-sm"
-                  title="All Modules Q-Bank With Answers (.md & Print PDF)"
+                  className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-2 rounded-md text-xs md:text-sm font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-sm"
+                  title="All Modules Q-Bank With Answers"
                 >
                   <FileText className="w-4 h-4 text-amber-300" />
-                  <span>All Modules Q-Bank With Ans (.md & PDF)</span>
+                  <span>All Modules Q-Bank With Ans</span>
                 </button>
               ) : (
                 <button

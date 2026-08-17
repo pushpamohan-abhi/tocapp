@@ -3,6 +3,8 @@ import { CURRICULUM_SECTIONS } from '../data/curriculumData';
 import { VTU_QUESTION_BANKS, MODULE_QUIZZES } from '../data/vtuData';
 import { UserProfile, QuizScoreRecord } from '../types';
 import { BookOpen, Lightbulb, Globe, Code, Layers, CheckCircle2, GraduationCap, Play, Download, HelpCircle, Award, Lock, Unlock, ShieldAlert, FileSpreadsheet, Check, UserCheck, FileText } from 'lucide-react';
+import { StateDiagram } from './StateDiagram';
+import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 interface ModuleViewProps {
@@ -25,23 +27,23 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
   if (moduleNumber === 1) {
     sectionIds = ['1.0', '1.1', '1.5', '2.2', '2.3', '2.4', '2.5'];
     moduleTitle = 'Lectures & Manifolds (Module 1)';
-    ullmanSubtitle = 'Padma Reddy & Ullman Chapters 1 & 2 • Set Theory Prerequisites, DFA, NFA, ε-NFA, Subset Construction, Minimization';
+    ullmanSubtitle = 'Set Theory Prerequisites, DFA, NFA, ε-NFA, Subset Construction, Minimization';
   } else if (moduleNumber === 2) {
     sectionIds = ['3.1', '3.2', '3.3', '4.1', '4.2', '4.4'];
     moduleTitle = 'Lectures & Manifolds (Module 2)';
-    ullmanSubtitle = 'Ullman Chapters 3 & 4 • Regular Expressions, Pumping Lemma, Closure Properties';
+    ullmanSubtitle = 'Regular Expressions, Pumping Lemma, Closure Properties';
   } else if (moduleNumber === 3) {
     sectionIds = ['5.1', '5.2', '5.4', '6.1', '6.2', '6.3.1', '6.4'];
     moduleTitle = 'Lectures & Manifolds (Module 3)';
-    ullmanSubtitle = 'Ullman Chapters 5 & 6 • Context-Free Grammars, Parse Trees, PDA, CNF';
+    ullmanSubtitle = 'Context-Free Grammars, Parse Trees, PDA, CNF';
   } else if (moduleNumber === 4) {
     sectionIds = ['7.1', '7.2', '7.3'];
     moduleTitle = 'Lectures & Manifolds (Module 4)';
-    ullmanSubtitle = 'Ullman Chapter 7 • Turing Machines, Programming Techniques, Extensions';
+    ullmanSubtitle = 'Turing Machines, Programming Techniques, Extensions';
   } else {
     sectionIds = ['7.1', '7.2', '7.3'];
     moduleTitle = 'Lectures & Manifolds (Module 5)';
-    ullmanSubtitle = 'Ullman Chapters 8 & 9 • Undecidability, Recursive & Recursively Enumerable Languages';
+    ullmanSubtitle = 'Undecidability, Recursive & Recursively Enumerable Languages';
   }
 
   const moduleSections = CURRICULUM_SECTIONS.filter(s => sectionIds.includes(s.id));
@@ -49,6 +51,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
   const activeSection = moduleSections.find(s => s.id === selectedId) || moduleSections[0];
 
   const [activeTab, setActiveTab] = useState<'lectures' | 'vtu' | 'quiz'>('lectures');
+  const [isGenerating, setIsGenerating] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Quiz state & single attempt tracking
@@ -175,64 +178,38 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
   };
 
 
+  // Add this inside the component to render all sections for printing
+  const fullContentRef = React.useRef<HTMLDivElement>(null);
+
   const openMarkdownAndPrintPdf = () => {
-    let content = `# ${moduleTitle}\n${ullmanSubtitle}\n\n`;
-    moduleSections.forEach(sec => {
-      content += `## Section ${sec.number}: ${sec.title}\n`;
-      content += `Ullman Chapter: ${sec.ullmanChapter}\n\n`;
-      content += `### Summary\n${sec.summary}\n\n`;
-      content += `### Lecturer Teaching Methods\n`;
-      sec.lecturerMethods.forEach(m => content += `- ${m}\n`);
-      content += `\n### Fundamental Concepts & Analogies\n`;
-      sec.keyConcepts.forEach(c => {
-        content += `- **${c.term}**: ${c.definition} (Analogy: ${c.analogy})\n`;
-      });
-      content += `\n### Manifold Representations\n`;
-      content += `- Algebraic: ${sec.manifold.algebraic}\n`;
-      content += `- Set-Builder: ${sec.manifold.setBuilder}\n`;
-      content += `- Formal Tuple: ${sec.manifold.formalTuple}\n`;
-      content += `- Description: ${sec.manifold.description}\n\n`;
-      content += `### Real-World Engineering Applications\n`;
-      sec.realWorldApps.forEach(app => content += `- ${app}\n`);
-      
-      if (sec.padmaReddyExamples && sec.padmaReddyExamples.length > 0) {
-        content += `\n### Dr. A.M. Padma Reddy Textbook — Step-by-Step Solved Numerical Examples\n`;
-        sec.padmaReddyExamples.forEach((ex, idx) => {
-          content += `\n#### Example ${idx + 1}: ${ex.title}\n`;
-          content += `**Problem Statement:**\n${ex.problem}\n\n`;
-          content += `**Step-by-Step Numerical Walkthrough:**\n`;
-          ex.stepByStepSolution.forEach(step => {
-            content += `- ${step}\n`;
-          });
-          content += `\n**Final Solution / Result:** ${ex.finalAnswer}\n`;
-        });
-      }
-
-      content += `\n\n`;
-    });
-
     const printWin = window.open('', '_blank');
     if (printWin) {
       printWin.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
-            <title>${moduleTitle} - Study Notes (.md View & Print)</title>
+            <title>${moduleTitle} - Study Notes - Print</title>
             <style>
-              body { font-family: 'Courier New', Courier, monospace; padding: 40px; background: #fff; color: #111; line-height: 1.6; white-space: pre-wrap; font-size: 13px; }
-              h1 { font-size: 20px; border-bottom: 2px solid #991b1b; padding-bottom: 10px; color: #991b1b; }
-              h2 { font-size: 16px; margin-top: 30px; color: #111; border-bottom: 1px dashed #ccc; padding-bottom: 4px; }
-              h3 { font-size: 14px; margin-top: 15px; color: #333; font-weight: bold; }
-              h4 { font-size: 13px; margin-top: 10px; color: #666; }
-              @media print {
-                body { padding: 15px; }
-              }
+              ${document.styleSheets[0].ownerNode ? Array.from(document.styleSheets).map(sheet => {
+                try {
+                  return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
+                } catch(e) { return ''; }
+              }).join('\n') : ''}
+              body { font-family: 'Helvetica', sans-serif; padding: 20px; background: #fff; color: #111; }
+              footer { position: fixed; bottom: 15px; left: 15px; font-size: 10px; color: #666; }
+              @media print { body { padding: 15px; } }
             </style>
           </head>
-          <body>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+          <body>
+            <div id="print-content">
+              <h1>${moduleTitle}</h1>
+              ${fullContentRef.current?.innerHTML || '<h1>Content not loaded</h1>'}
+            </div>
+            <footer>Dept of CSE, HKBKCE</footer>
             <script>
               window.onload = function() {
                 window.print();
+                window.close();
               };
             </script>
           </body>
@@ -240,165 +217,103 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
       `);
       printWin.document.close();
     }
+
   };
 
-  const downloadPdfStudyNotes = () => {
+  const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  
+  const downloadPdfStudyNotes = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let y = 15;
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.setTextColor(153, 27, 27); // #991b1b
-      doc.text(`VTU Study Notes - ${moduleTitle}`, pageWidth / 2, y, { align: "center" });
+      // Create a doc and immediately add content
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const headerHeight = 20;
+      const footerHeight = 20;
+      const usableHeight = pageHeight - headerHeight - footerHeight;
       
-      y += 8;
-      doc.setFontSize(9);
-      doc.setTextColor(80, 80, 80);
-      doc.text(ullmanSubtitle, pageWidth / 2, y, { align: "center", maxWidth: pageWidth - 30 });
+      let currentY = headerHeight;
+      // We don't need isFirstPage flag anymore as the first page is created by default by new jsPDF('p', 'mm', 'a4')
 
-      y += 15;
+      for (let i = 0; i < sectionRefs.current.length; i++) {
+        const sectionEl = sectionRefs.current[i];
+        if (!sectionEl) continue;
 
-      moduleSections.forEach((sec, sIdx) => {
-        if (y > 240) { doc.addPage(); y = 15; }
-        
-        // Section Header
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(153, 27, 27);
-        doc.text(`Section ${sec.number}: ${sec.title}`, 15, y);
-        y += 5;
+        const canvas = await html2canvas(sectionEl, { scale: 1.5, useCORS: true });
+        const imgData = canvas.toDataURL('image/png', 0.8);
+        const sectionWidth = pageWidth;
+        const sectionHeight = (canvas.height * pageWidth) / canvas.width;
 
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(9);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Ullman Chapter: ${sec.ullmanChapter}`, 15, y);
-        y += 6;
-
-        // Summary
-        if (y > 250) { doc.addPage(); y = 15; }
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setTextColor(30, 30, 30);
-        doc.text("Summary:", 15, y);
-        y += 5;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        const summaryLines = doc.splitTextToSize(sec.summary, pageWidth - 30);
-        doc.text(summaryLines, 15, y);
-        y += summaryLines.length * 4 + 6;
-
-        // Lecturer Methods
-        if (sec.lecturerMethods && sec.lecturerMethods.length > 0) {
-          if (y > 250) { doc.addPage(); y = 15; }
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.text("Lecturer Teaching Methods:", 15, y);
-          y += 5;
-          doc.setFont("helvetica", "normal");
-          sec.lecturerMethods.forEach(m => {
-            if (y > 270) { doc.addPage(); y = 15; }
-            const mLines = doc.splitTextToSize(`• ${m}`, pageWidth - 35);
-            doc.text(mLines, 18, y);
-            y += mLines.length * 4 + 3;
-          });
-          y += 3;
+        // If the section doesn't fit on the current page, start it on a fresh page.
+        // If it's the very first section on the very first page, we don't add a new page.
+        if (i > 0 && currentY + sectionHeight > pageHeight - footerHeight) {
+          doc.addPage();
+          currentY = headerHeight;
         }
 
-        // Key Concepts & Analogies
-        if (sec.keyConcepts && sec.keyConcepts.length > 0) {
-          if (y > 250) { doc.addPage(); y = 15; }
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.text("Key Concepts & Analogies:", 15, y);
-          y += 5;
-          doc.setFont("helvetica", "normal");
-          sec.keyConcepts.forEach(c => {
-            if (y > 270) { doc.addPage(); y = 15; }
-            const cLines = doc.splitTextToSize(`• ${c.term}: ${c.definition} (Analogy: ${c.analogy})`, pageWidth - 35);
-            doc.text(cLines, 18, y);
-            y += cLines.length * 4 + 3;
-          });
-          y += 3;
+        // If the section is taller than the usable page height, split it
+        if (sectionHeight > usableHeight) {
+          let remainingHeight = sectionHeight;
+          let currentCanvasY = 0;
+          
+          while (remainingHeight > 0) {
+            const partHeight = Math.min(remainingHeight, usableHeight);
+            
+            // Create a sub-canvas for this part
+            const subCanvas = document.createElement('canvas');
+            subCanvas.width = canvas.width;
+            subCanvas.height = (partHeight * canvas.width) / pageWidth;
+            const subCtx = subCanvas.getContext('2d');
+            subCtx?.drawImage(canvas, 0, (currentCanvasY * canvas.width) / pageWidth, canvas.width, subCanvas.height, 0, 0, subCanvas.width, subCanvas.height);
+            
+            doc.addImage(subCanvas.toDataURL('image/png', 0.8), 'PNG', 0, currentY, pageWidth, partHeight);
+            
+            remainingHeight -= partHeight;
+            currentCanvasY += partHeight;
+            
+            if (remainingHeight > 0) {
+              doc.addPage();
+              currentY = headerHeight;
+            } else {
+              currentY += partHeight;
+            }
+          }
+        } else {
+          doc.addImage(imgData, 'PNG', 0, currentY, sectionWidth, sectionHeight);
+          currentY += sectionHeight;
         }
-
-        // Manifold Representations
-        if (sec.manifold) {
-          if (y > 250) { doc.addPage(); y = 15; }
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.text("Manifold Representations:", 15, y);
-          y += 5;
-          doc.setFont("helvetica", "normal");
-          const manLines = doc.splitTextToSize(`• Algebraic: ${sec.manifold.algebraic}\n• Set-Builder: ${sec.manifold.setBuilder}\n• Formal Tuple: ${sec.manifold.formalTuple}\n• Description: ${sec.manifold.description}`, pageWidth - 35);
-          doc.text(manLines, 18, y);
-          y += manLines.length * 4 + 5;
-        }
-
-        // Real-World Applications
-        if (sec.realWorldApps && sec.realWorldApps.length > 0) {
-          if (y > 250) { doc.addPage(); y = 15; }
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.text("Real-World Engineering Applications:", 15, y);
-          y += 5;
-          doc.setFont("helvetica", "normal");
-          sec.realWorldApps.forEach(app => {
-            if (y > 270) { doc.addPage(); y = 15; }
-            const aLines = doc.splitTextToSize(`• ${app}`, pageWidth - 35);
-            doc.text(aLines, 18, y);
-            y += aLines.length * 4 + 3;
-          });
-          y += 3;
-        }
-
-        // Padma Reddy Numerical Examples
-        if (sec.padmaReddyExamples && sec.padmaReddyExamples.length > 0) {
-          if (y > 240) { doc.addPage(); y = 15; }
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.setTextColor(153, 27, 27);
-          doc.text("Dr. A.M. Padma Reddy Textbook — Solved Numerical Examples:", 15, y);
-          y += 5;
-          doc.setTextColor(30, 30, 30);
-
-          sec.padmaReddyExamples.forEach((ex, exIdx) => {
-            if (y > 250) { doc.addPage(); y = 15; }
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(9);
-            doc.text(`Example ${exIdx + 1}: ${ex.title}`, 18, y);
-            y += 4;
-            doc.setFont("helvetica", "normal");
-            const probLines = doc.splitTextToSize(`Problem: ${ex.problem}`, pageWidth - 40);
-            doc.text(probLines, 18, y);
-            y += probLines.length * 4 + 3;
-
-            doc.setFont("helvetica", "bold");
-            doc.text("Step-by-Step Walkthrough:", 18, y);
-            y += 4;
-            doc.setFont("helvetica", "normal");
-            ex.stepByStepSolution.forEach(step => {
-              if (y > 270) { doc.addPage(); y = 15; }
-              const sLines = doc.splitTextToSize(`- ${step}`, pageWidth - 45);
-              doc.text(sLines, 21, y);
-              y += sLines.length * 4 + 2;
-            });
-
-            if (y > 265) { doc.addPage(); y = 15; }
-            doc.setFont("helvetica", "bold");
-            doc.text(`Final Answer: ${ex.finalAnswer}`, 18, y);
-            y += 6;
-          });
-        }
-
-        y += 8;
-      });
-
-      doc.save(`Automata_Module_${moduleNumber}_Comprehensive_Study_Notes.pdf`);
+      }
+      
+      addHeaderFooter(doc);
+      doc.save(`${moduleTitle.replace(/\s+/g, '_')}_Study_Notes.pdf`);
     } catch (e) {
-      console.error(e);
-      alert("Error generating PDF. Please try again.");
+      console.error("PDF Generation Error:", e);
+      alert(`Error generating PDF: ${e instanceof Error ? e.message : 'Unknown error'}. Please try again.`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const addHeaderFooter = (doc: any) => {
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      
+      // Header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      doc.text("Dept of CSE, HKBKCE", 15, 10);
+      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.getWidth() - 15, 10, { align: "right" });
+      doc.line(15, 12, doc.internal.pageSize.getWidth() - 15, 12); // Separator
+
+      // Footer
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.line(15, doc.internal.pageSize.getHeight() - 12, doc.internal.pageSize.getWidth() - 15, doc.internal.pageSize.getHeight() - 12); // Separator
     }
   };
 
@@ -576,34 +491,37 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
 
         <div className="flex flex-wrap gap-2.5 pt-2 border-t border-slate-100">
           <button
-            onClick={openMarkdownAndPrintPdf}
-            className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
-            title="Open Study Notes as .md and Print / Save PDF"
+            onClick={downloadPdfStudyNotes}
+            disabled={isGenerating}
+            className={`px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm ${
+              isGenerating ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#0F172A] hover:bg-black'
+            } text-white`}
+            title="Download Study Notes PDF"
           >
-            <FileText className="w-4 h-4 text-amber-300" />
-            <span>Study Notes (.md & PDF)</span>
+            <FileText className={`w-4 h-4 ${isGenerating ? 'animate-spin' : 'text-amber-300'}`} />
+            <span>{isGenerating ? 'Generating...' : 'Study Notes'}</span>
           </button>
           
           <button
             onClick={() => openQBankMarkdownAndPrintPdf(false)}
-            className="bg-[#334155] hover:bg-[#1e293b] text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
-            title="Q-Bank Without Answers (.md & Print PDF)"
+            className="bg-[#0F172A] hover:bg-black text-white px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm"
+            title="Q-Bank Without Answers and Print"
           >
             <FileText className="w-4 h-4 text-amber-300" />
-            <span>Q-Bank No Ans (.md & PDF)</span>
+            <span>Q-Bank No Ans</span>
           </button>
 
           <button
             onClick={() => openQBankMarkdownAndPrintPdf(true)}
             className={`px-3.5 py-2.5 rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all flex items-center space-x-1.5 shadow-sm ${
               canViewAnswers
-                ? 'bg-[#991b1b] hover:bg-[#7f1d1d] text-white'
+                ? 'bg-[#0F172A] hover:bg-black text-white'
                 : 'bg-slate-300 text-slate-700 cursor-not-allowed'
             }`}
-            title={canViewAnswers ? "Q-Bank With Answers (.md & Print PDF)" : "Faculty permission required"}
+            title={canViewAnswers ? "Q-Bank With Answers and Print" : "Faculty permission required"}
           >
             {!canViewAnswers ? <Lock className="w-4 h-4 text-amber-600" /> : <FileText className="w-4 h-4 text-amber-300" />}
-            <span>Q-Bank With Ans (.md & PDF)</span>
+            <span>Q-Bank With Ans</span>
           </button>
 
         </div>
@@ -665,6 +583,104 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
         </button>
       </div>
 
+      {/* Hidden container for full print capture */}
+      <div className="fixed left-[-9999px] top-0 w-[800px]" style={{ fontFamily: 'sans-serif, Arial, Helvetica', backgroundColor: '#ffffff', padding: '20px' }}>
+        {moduleSections.map((sec, idx) => (
+          <div key={sec.id} ref={el => sectionRefs.current[idx] = el} style={{ backgroundColor: '#ffffff', borderRadius: '0.75rem', padding: '1.75rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', border: '2px solid #e2e8f0', marginBottom: '2rem' }}>
+            <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#991b1b', backgroundColor: '#fef2f2', padding: '0.25rem 0.625rem', borderRadius: '0.25rem', border: '1px solid #fecaca' }}>
+                Section {sec.number} • Ullman {sec.ullmanChapter}
+              </span>
+              <h3 style={{ fontFamily: 'serif', fontStyle: 'italic', fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem' }}>{sec.title}</h3>
+              <p style={{ fontSize: '1rem', color: '#1e293b', lineHeight: '1.6', fontWeight: 500, marginTop: '0.5rem' }}>{sec.summary}</p>
+            </div>
+            
+            <div style={{ marginTop: '1.5rem' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#0f172a' }}>Lecturer Teaching Methods</span>
+              <ul style={{ marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
+                {sec.lecturerMethods.map((m, idx) => (
+                  <li key={idx} style={{ fontSize: '1rem', color: '#1e293b', fontWeight: 500, backgroundColor: '#f8fafc', padding: '0.875rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', marginTop: '0.5rem' }}>
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div style={{ marginTop: '1.5rem' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#0f172a' }}>Fundamental Concepts & Analogies</span>
+              {sec.keyConcepts.map((c, idx) => (
+                <div key={idx} style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', marginTop: '0.75rem' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '1rem', fontWeight: 800, color: '#dc2626' }}>{c.term}</span>
+                  <p style={{ fontSize: '1rem', color: '#0f172a', fontWeight: 500, marginTop: '0.25rem' }}>{c.definition}</p>
+                  <div style={{ fontSize: '0.875rem', color: '#334155', fontStyle: 'italic', fontFamily: 'serif', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                    Analogy: {c.analogy}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {sec.padmaReddyExamples && sec.padmaReddyExamples.length > 0 && (
+              <div style={{ paddingTop: '1rem', borderTop: '2px solid #e2e8f0', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', color: '#991b1b', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', backgroundColor: '#fef2f2', padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+                  Dr. A.M. Padma Reddy Textbook — Step-by-Step Solved Numerical Examples
+                </div>
+
+                <div style={{ marginTop: '1rem' }}>
+                  {sec.padmaReddyExamples.map((ex, idx) => (
+                    <div key={idx} style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '0.5rem', borderLeft: '4px solid #dc2626', borderTop: '1px solid #cbd5e1', borderBottom: '1px solid #cbd5e1', borderRight: '1px solid #cbd5e1', marginTop: '1rem' }}>
+                      <h5 style={{ fontFamily: 'serif', fontStyle: 'italic', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                        {ex.title}
+                      </h5>
+                      <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '0.25rem', border: '1px solid #fcd34d', fontSize: '1rem', fontFamily: 'monospace', color: '#000', fontWeight: 700, marginTop: '0.5rem' }}>
+                        <strong style={{ color: '#dc2626', fontWeight: 800 }}>Problem Statement:</strong> {ex.problem}
+                      </div>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#475569', display: 'block' }}>Step-by-Step Numerical Walkthrough:</span>
+                        {ex.stepByStepSolution.map((step, sIdx) => (
+                          <p key={sIdx} style={{ fontSize: '1rem', color: '#fef3c7', fontFamily: 'monospace', lineHeight: '1.5', backgroundColor: '#0f172a', padding: '0.875rem', borderRadius: '0.25rem', border: '1px solid #334155', marginTop: '0.5rem' }}>
+                            {step}
+                          </p>
+                        ))}
+                      </div>
+                      <div style={{ backgroundColor: '#d1fae5', border: '1px solid #6ee7b7', padding: '1rem', borderRadius: '0.25rem', fontSize: '1rem', fontFamily: 'monospace', color: '#064e3b', fontWeight: 800, marginTop: '0.5rem' }}>
+                        ✅ Solution / Final Result: {ex.finalAnswer}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: '1.5rem', color: '#1e293b' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#0f172a' }}>Manifold Representations</span>
+              <p style={{ marginTop: '0.75rem', fontSize: '1rem' }}>Algebraic: {sec.manifold.algebraic}</p>
+              <p style={{ fontSize: '1rem' }}>Set-Builder: {sec.manifold.setBuilder}</p>
+              <p style={{ fontSize: '1rem' }}>Formal Tuple: {sec.manifold.formalTuple}</p>
+              <p style={{ fontSize: '1rem' }}>Description: {sec.manifold.description}</p>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', color: '#1e293b' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#0f172a' }}>Real-World Engineering Applications</span>
+              <ul style={{ paddingLeft: '1.25rem', marginTop: '0.75rem' }}>
+                {sec.realWorldApps.map((app, idx) => (
+                  <li key={idx} style={{ fontSize: '1rem', marginTop: '0.5rem' }}>
+                    <strong>{typeof app === 'string' ? app : (app as any).name}</strong>
+                    {typeof app !== 'string' && (app as any).diagram && (
+                      <div style={{ marginTop: '0.25rem', padding: '0.5rem', backgroundColor: '#f1f5f9', borderRadius: '0.25rem', fontSize: '0.875rem' }}>
+                        <div style={{ fontWeight: 800 }}>State Diagram:</div>
+                        <div>States: {(app as any).diagram.states.join(', ')}</div>
+                        <div>Transitions: {(app as any).diagram.transitions.join(', ')}</div>
+                        <div style={{ marginTop: '0.25rem' }}>{ (app as any).diagram.explanation }</div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+      
       {/* Tab 1: Lectures & Manifolds */}
       {activeTab === 'lectures' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -695,7 +711,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
                     Section {activeSection.number} • Ullman {activeSection.ullmanChapter}
                   </span>
                 </div>
-                <h3 className="font-serif italic text-2xl md:text-3xl font-extrabold text-[#0F172A]">
+                <h3 className="font-serif italic text-[12px] font-bold text-slate-900">
                   {activeSection.title}
                 </h3>
                 <p className="text-sm md:text-base text-slate-800 leading-relaxed font-sans font-medium">
@@ -751,7 +767,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
                         <h5 className="font-serif italic text-lg md:text-xl font-extrabold text-[#0F172A]">
                           {ex.title}
                         </h5>
-                        <div className="bg-amber-50 p-3.5 rounded-md border border-amber-300 text-xs md:text-sm font-mono whitespace-pre-wrap text-slate-900 font-bold">
+                        <div className="bg-amber-50 p-3.5 rounded-md border border-amber-300 text-xs md:text-sm font-mono whitespace-pre-wrap text-black font-bold">
                           <strong className="text-[#dc2626] font-extrabold">Problem Statement:</strong> {ex.problem}
                         </div>
                         <div className="space-y-2">
@@ -818,9 +834,18 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
               </div>
               <ul className="space-y-3">
                 {activeSection.realWorldApps.map((app, idx) => (
-                  <li key={idx} className="flex items-start space-x-3 text-xs md:text-sm text-slate-100 bg-white/10 p-3.5 rounded-lg border border-white/10 font-medium">
-                    <Code className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                    <span>{app}</span>
+                  <li key={idx} className="flex flex-col space-y-2 text-xs md:text-sm text-slate-100 bg-white/10 p-3.5 rounded-lg border border-white/10 font-medium">
+                    <div className="flex items-start space-x-3">
+                        <Code className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <span>{typeof app === 'string' ? app : (app as any).name}</span>
+                    </div>
+                    {typeof app !== 'string' && (app as any).diagram && (
+                        <StateDiagram 
+                          states={(app as any).diagram.states} 
+                          transitions={(app as any).diagram.transitions} 
+                          explanation={(app as any).diagram.explanation} 
+                        />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -835,7 +860,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
               <span className="text-xs font-extrabold text-[#991b1b] tracking-widest uppercase font-mono bg-red-50 px-2.5 py-1 rounded">VTU Examination Question Bank</span>
-              <h3 className="font-serif italic text-2xl md:text-3xl font-extrabold text-[#0F172A] mt-2">Module {moduleNumber} Exam Questions & Solutions</h3>
+              <h3 className="font-serif italic text-[12px] font-bold text-slate-900 mt-2">Module {moduleNumber} Exam Questions & Solutions</h3>
             </div>
 
             <div className="flex flex-wrap gap-2 items-center">
@@ -900,7 +925,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
                     {q.marks} Marks
                   </span>
                 </div>
-                <h4 className="font-serif text-lg md:text-xl font-extrabold text-[#0F172A]">{q.question}</h4>
+                <h4 className="font-serif text-[12px] font-bold text-slate-900">{q.question}</h4>
 
                 {canViewAnswers ? (
                   <div className="bg-amber-50 p-4 rounded-lg border-l-4 border-l-amber-600 border-y border-r border-amber-300 space-y-2">
@@ -929,7 +954,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
               <span className="text-xs font-extrabold text-[#991b1b] tracking-widest uppercase font-mono bg-red-50 px-2.5 py-1 rounded">
                 Module {moduleNumber} Quiz Evaluation
               </span>
-              <h3 className="font-serif italic text-2xl md:text-3xl font-extrabold text-[#0F172A] mt-2">Single-Attempt Module Quiz</h3>
+              <h3 className="font-serif italic text-[12px] font-bold text-slate-900 mt-2">Single-Attempt Module Quiz</h3>
               <p className="text-xs md:text-sm text-slate-700 font-mono font-bold mt-1">
                 User: <strong className="text-[#0F172A]">{currentUser.name}</strong> ({currentUser.id}) • Role: <strong className="text-[#991b1b]">{currentUser.role.toUpperCase()}</strong>
               </p>
@@ -976,7 +1001,7 @@ export const ModuleView: React.FC<ModuleViewProps> = ({
           <div className="space-y-6">
             {moduleQuizzes.map((q, idx) => (
               <div key={q.id} className="bg-slate-50 p-6 rounded-xl border border-slate-300 space-y-4 shadow-sm">
-                <h4 className="font-serif text-lg md:text-xl font-extrabold text-[#0F172A]">
+                <h4 className="font-serif text-[12px] font-bold text-slate-900">
                   Q{idx + 1}. {q.question}
                 </h4>
 

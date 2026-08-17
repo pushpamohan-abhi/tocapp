@@ -28,7 +28,7 @@ export interface CurriculumSection {
   ullmanChapter: string;
   summary: string;
   lecturerMethods: string[];
-  realWorldApps: string[];
+  realWorldApps: (string | { name: string; diagram?: { states: string[]; transitions: string[]; explanation: string } })[];
   manifold: {
     algebraic: string;
     setBuilder: string;
@@ -138,8 +138,30 @@ export const CURRICULUM_SECTIONS: CurriculumSection[] = [
       'Analogy of finite state machines to automatic sliding doors or elevator control systems.'
     ],
     realWorldApps: [
-      'Vending machine coin counters and controller logic',
-      'Digital watch state logic and traffic light controllers'
+      {
+        name: 'Vending machine coin counters and controller logic',
+        diagram: {
+          states: ['Idle', 'Collecting', 'Dispensing'],
+          transitions: ['Idle -> Collecting (Coin Insert)', 'Collecting -> Dispensing (Target Reached)', 'Dispensing -> Idle (Dispense Complete)'],
+          explanation: 'The machine tracks accumulated coin value in "Collecting" state. Once the target amount is met, it transitions to "Dispensing" to release the item, then returns to "Idle".'
+        }
+      },
+      {
+        name: 'Digital watch state logic',
+        diagram: {
+          states: ['Display Time', 'Set Hours', 'Set Minutes'],
+          transitions: ['Display Time -> Set Hours (Mode Button)', 'Set Hours -> Set Minutes (Mode Button)', 'Set Minutes -> Display Time (Mode Button)'],
+          explanation: 'The watch cycles through modes upon button presses. Each mode modifies a specific part of the displayed time, cycling back to the main display.'
+        }
+      },
+      {
+        name: 'Traffic light controllers',
+        diagram: {
+          states: ['Red', 'Green', 'Yellow'],
+          transitions: ['Red -> Green (Timer Expired)', 'Green -> Yellow (Timer Expired)', 'Yellow -> Red (Timer Expired)'],
+          explanation: 'A cyclic controller that transitions between states based on set timers to regulate traffic flow.'
+        }
+      }
     ],
     manifold: {
       algebraic: 'Σ* = ∪_{k≥0} Σ^k',
